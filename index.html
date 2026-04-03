@@ -14,7 +14,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="style.css?v=8" />
+  <link rel="stylesheet" href="style.css?v=9" />
 </head>
 <body>
 
@@ -48,56 +48,7 @@
       </button>
     </nav>
 
-    <button id="settings-btn" title="Configuración">
-      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-        <circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
-      </svg>
-    </button>
   </header>
-
-  <!-- SETTINGS MODAL -->
-  <div id="settings-modal" class="modal hidden">
-    <div class="modal-box">
-      <div class="modal-header">
-        <div class="modal-icon">🔑</div>
-        <div>
-          <h2>API Key de Claude</h2>
-          <p>Necesaria solo para el Chat con IA</p>
-        </div>
-      </div>
-      <div class="field-group">
-        <label for="api-key-input">API Key de Anthropic <span style="color:#6b6b90;font-weight:400">(chat con IA)</span></label>
-        <div class="input-wrap">
-          <input type="password" id="api-key-input" placeholder="sk-ant-api03-..." autocomplete="off" />
-          <button id="toggle-key-visibility" class="input-action" title="Mostrar/ocultar">👁</button>
-        </div>
-        <small>🔒 Solo se guarda en tu navegador. Nunca sale de tu dispositivo.</small>
-      </div>
-
-      <div class="modal-divider"></div>
-
-      <div class="field-group">
-        <label for="eleven-key-input">
-          API Key de ElevenLabs
-          <span style="background:linear-gradient(135deg,#7c6fff,#f472b6);-webkit-background-clip:text;-webkit-text-fill-color:transparent;font-weight:700;font-size:0.75rem;margin-left:6px">VOZ NATURAL</span>
-        </label>
-        <div class="input-wrap">
-          <input type="password" id="eleven-key-input" placeholder="Opcional — voz IA ultra realista" autocomplete="off" />
-          <button id="toggle-eleven-visibility" class="input-action" title="Mostrar/ocultar">👁</button>
-        </div>
-        <small>
-          ✨ Con ElevenLabs la voz suena completamente humana. Gratis en <strong>elevenlabs.io</strong><br>
-          → Regístrate → Profile → API Keys → copia y pega aquí.<br>
-          💡 Sin clave: abre esta app en <strong>Microsoft Edge</strong> para mejores voces del navegador.
-        </small>
-      </div>
-
-      <div class="modal-actions">
-        <button id="close-modal-btn" class="btn-ghost">Cancelar</button>
-        <button id="save-key-btn" class="btn-primary">Guardar clave</button>
-      </div>
-    </div>
-  </div>
 
   <!-- MAIN -->
   <main>
@@ -284,7 +235,7 @@
 
   </main>
 
-  <script src="app.js?v=7"></script>
+  <script src="app.js?v=8"></script>
   <script>
     // Registrar Service Worker para PWA
     if ('serviceWorker' in navigator) {

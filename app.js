@@ -1,13 +1,16 @@
 // ============================================================
+//  API PROXY — todas las llamadas van al worker de Cloudflare
+// ============================================================
+// IMPORTANTE: Cambiar esta URL después de deployar el worker
+const API_BASE = localStorage.getItem("fluentia_api_url") || "https://fluentia-api.TU_USUARIO.workers.dev";
+
+// ============================================================
 //  TEXT-TO-SPEECH — Aria speaks aloud
 // ============================================================
 const synth = window.speechSynthesis;
 let ariaVoice = null;
 let ttsEnabled = true;
-let elevenLabsKey = localStorage.getItem("elevenlabs_api_key") || "";
-
-// ElevenLabs voice ID — "Adam" (natural male English voice)
-const ELEVEN_VOICE_ID = "pNInz6obpgDQGcFmaJgB";
+let elevenLabsEnabled = false; // se activa si el worker tiene ElevenLabs configurado
 
 // --- Browser voice — best available male voice ---
 function loadVoices() {
@@ -95,23 +98,16 @@ function setSpeaking(on) {
   }
 }
 
-// --- ElevenLabs TTS (natural AI voice) ---
+// --- ElevenLabs TTS via proxy ---
 async function speakElevenLabs(text) {
   setSpeaking(true);
   try {
-    const res = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${ELEVEN_VOICE_ID}/stream`, {
+    const res = await fetch(`${API_BASE}/api/tts`, {
       method: "POST",
-      headers: {
-        "xi-api-key": elevenLabsKey,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        text,
-        model_id: "eleven_turbo_v2",
-        voice_settings: { stability: 0.5, similarity_boost: 0.75, style: 0.3, use_speaker_boost: true }
-      })
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ text })
     });
-    if (!res.ok) throw new Error("ElevenLabs error");
+    if (!res.ok) throw new Error("TTS error");
     const blob = await res.blob();
     const url  = URL.createObjectURL(blob);
     const audio = new Audio(url);
@@ -120,7 +116,7 @@ async function speakElevenLabs(text) {
     await audio.play();
   } catch {
     setSpeaking(false);
-    speakBrowser(text); // fallback
+    speakBrowser(text);
   }
 }
 
@@ -145,7 +141,7 @@ function ariaSpeak(text) {
   if (!ttsEnabled) return;
   const clean = cleanForSpeech(text);
   if (!clean) return;
-  if (elevenLabsKey) {
+  if (elevenLabsEnabled) {
     speakElevenLabs(clean);
   } else {
     speakBrowser(clean);
@@ -180,7 +176,6 @@ let currentCard    = 0;
 let masteredCards  = new Set();
 let quizScore      = 0;
 let quizTotal      = 0;
-let apiKey         = localStorage.getItem("claude_api_key") || "";
 let chatHistory    = [];
 
 // ============================================================
@@ -236,7 +231,7 @@ STRICT FORMAT RULES:
 - Write in plain conversational text only. Like a friend texting.
 - 1-2 short sentences per language. Be direct and natural.
 - English answer first, then [ES], then Spanish translation.
-- Tell the user to go to the Level tab to take the placement test.`;
+- Suggest the user to go to the Level tab to take the placement test for a personalized experience.`;
   }
 
   return `You are George, a friendly English tutor. The user's level is ${userLevel}.
@@ -274,9 +269,9 @@ document.querySelectorAll(".nav-btn").forEach(btn => {
             addMessage(greeting, "bot");
             ariaSpeak(`Welcome! Your level is ${userLevel}. Let's start your lesson.`);
           } else {
-            const msg = `Hi! I'm George, your English tutor. Go to the "Level" tab first to take the placement test so I can personalize your lessons.\n[ES]\n¡Hola! Soy George, tu tutor de inglés. Ve a la pestaña "Level" primero para hacer el test de nivel y así personalizar tus lecciones.`;
+            const msg = `Hi! I'm George, your English tutor. Go to the "Level" tab to take the placement test so I can personalize your lessons.\n[ES]\n¡Hola! Soy George, tu tutor de inglés. Ve a la pestaña "Level" para hacer el test de nivel y así personalizar tus lecciones.`;
             addMessage(msg, "bot");
-            ariaSpeak("Hi! Go to the Level tab first to take the placement test.");
+            ariaSpeak("Hi! Go to the Level tab to take the placement test.");
           }
         }, 400);
       }
@@ -294,42 +289,19 @@ document.querySelectorAll(".nav-btn").forEach(btn => {
 });
 
 // ============================================================
-//  SETTINGS MODAL
+//  CHECK API HEALTH — verifica conexión al proxy
 // ============================================================
-const modal    = document.getElementById("settings-modal");
-const apiInput = document.getElementById("api-key-input");
-const toggleBtn = document.getElementById("toggle-key-visibility");
-
-const elevenInput  = document.getElementById("eleven-key-input");
-const toggleEleven = document.getElementById("toggle-eleven-visibility");
-
-document.getElementById("settings-btn").addEventListener("click", () => {
-  apiInput.value    = apiKey;
-  elevenInput.value = elevenLabsKey;
-  modal.classList.remove("hidden");
-});
-document.getElementById("close-modal-btn").addEventListener("click", () => modal.classList.add("hidden"));
-modal.addEventListener("click", e => { if (e.target === modal) modal.classList.add("hidden"); });
-
-document.getElementById("save-key-btn").addEventListener("click", () => {
-  apiKey = apiInput.value.trim();
-  localStorage.setItem("claude_api_key", apiKey);
-  elevenLabsKey = elevenInput.value.trim();
-  localStorage.setItem("elevenlabs_api_key", elevenLabsKey);
-  modal.classList.add("hidden");
-  const voiceType = elevenLabsKey ? "🎙 Voz natural (ElevenLabs) activada ✓" : "API Keys guardadas ✓";
-  toast(voiceType, "success");
-});
-
-toggleBtn.addEventListener("click", () => {
-  apiInput.type = apiInput.type === "password" ? "text" : "password";
-  toggleBtn.textContent = apiInput.type === "password" ? "👁" : "🙈";
-});
-
-toggleEleven.addEventListener("click", () => {
-  elevenInput.type = elevenInput.type === "password" ? "text" : "password";
-  toggleEleven.textContent = elevenInput.type === "password" ? "👁" : "🙈";
-});
+async function checkApiHealth() {
+  try {
+    const res = await fetch(`${API_BASE}/api/health`);
+    if (res.ok) {
+      const data = await res.json();
+      elevenLabsEnabled = data.tts === true;
+      return true;
+    }
+  } catch { }
+  return false;
+}
 
 // ============================================================
 //  TOAST
@@ -528,14 +500,9 @@ function addMessage(text, role, typing = false) {
 //  SHARED — callClaude helper
 // ============================================================
 async function callClaude(messages, systemPrompt, maxTokens = 250) {
-  const res = await fetch("https://api.anthropic.com/v1/messages", {
+  const res = await fetch(`${API_BASE}/api/chat`, {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "x-api-key": apiKey,
-      "anthropic-version": "2023-06-01",
-      "anthropic-dangerous-direct-browser-access": "true"
-    },
+    headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       model: "claude-haiku-4-5-20251001",
       max_tokens: maxTokens,
@@ -551,9 +518,9 @@ async function callClaude(messages, systemPrompt, maxTokens = 250) {
   let reply = data.content[0].text;
   if (!reply.includes("[ES]")) {
     try {
-      const trRes = await fetch("https://api.anthropic.com/v1/messages", {
+      const trRes = await fetch(`${API_BASE}/api/chat`, {
         method: "POST",
-        headers: { "Content-Type": "application/json", "x-api-key": apiKey, "anthropic-version": "2023-06-01", "anthropic-dangerous-direct-browser-access": "true" },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ model: "claude-haiku-4-5-20251001", max_tokens: 200, system: "Translate the following English text to natural Spanish. Only output the translation, nothing else.", messages: [{ role: "user", content: reply }] })
       });
       if (trRes.ok) { const trData = await trRes.json(); reply = reply + "\n[ES]\n" + trData.content[0].text; }
@@ -602,10 +569,6 @@ function updateLevelProgress() {
 }
 
 document.getElementById("start-level-btn").addEventListener("click", () => {
-  if (!apiKey) {
-    toast("Configura tu API Key primero en ⚙️", "error");
-    return;
-  }
   levelStep = 0;
   levelAnswers = [];
   levelHistory = [];
@@ -691,7 +654,7 @@ Format: English first, then [ES], then Spanish.`;
 
     } catch (err) {
       typingEl.remove();
-      addLevelMsg(`Error: ${err.message}. Verifica tu API Key en ⚙️.`, "bot");
+      addLevelMsg(`Error: ${err.message}`, "bot");
       levelInput.disabled = false;
     }
   }
@@ -711,10 +674,6 @@ async function sendMessage(text) {
   addMessage(text, "user");
   chatHistory.push({ role: "user", content: text });
 
-  if (!apiKey) {
-    addMessage("Para usar el Chat con IA necesitas configurar tu API Key de Claude. Haz clic en ⚙️ arriba a la derecha.", "bot");
-    return;
-  }
 
   const typingEl = addMessage("", "bot", true);
   const ariaSvg = document.getElementById("aria-svg");
@@ -730,7 +689,7 @@ async function sendMessage(text) {
   } catch (err) {
     if (ariaSvg) ariaSvg.classList.remove("speaking");
     typingEl.remove();
-    addMessage(`Error: ${err.message}. Verifica tu API Key en ⚙️.`, "bot");
+    addMessage(`Error de conexión. Intenta de nuevo.`, "bot");
   }
 }
 
