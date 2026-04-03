@@ -184,90 +184,42 @@ let apiKey         = localStorage.getItem("claude_api_key") || "";
 let chatHistory    = [];
 
 // ============================================================
-//  ADAPTIVE TUTOR — Estado de sesión
+//  LEVEL TEST — Evaluación separada del chat
 // ============================================================
-let tutorPhase     = localStorage.getItem("tutor_phase") || "assessment"; // assessment, classifying, teaching, conversation
-let userLevel      = localStorage.getItem("tutor_level") || "";           // A1, A2, B1, B2, C1
-let assessmentStep = parseInt(localStorage.getItem("tutor_step") || "0"); // 0-3 (4 preguntas)
-let assessmentAnswers = JSON.parse(localStorage.getItem("tutor_answers") || "[]");
+let userLevel      = localStorage.getItem("tutor_level") || "";
+let levelStep      = 0;
+let levelAnswers   = [];
+let levelHistory   = [];
 
-function saveTutorState() {
-  localStorage.setItem("tutor_phase", tutorPhase);
-  localStorage.setItem("tutor_level", userLevel);
-  localStorage.setItem("tutor_step", assessmentStep.toString());
-  localStorage.setItem("tutor_answers", JSON.stringify(assessmentAnswers));
-  updateTutorStatus();
-}
+function updateLevelUI() {
+  const badge = document.getElementById("level-badge");
+  const label = document.getElementById("level-label");
+  const desc  = document.getElementById("level-desc");
+  const startBtn = document.getElementById("start-level-btn");
+  const resetBtn = document.getElementById("reset-level-btn");
+  const statusEl = document.getElementById("tutor-status");
 
-function updateTutorStatus() {
-  const el = document.getElementById("tutor-status");
-  if (!el) return;
   if (userLevel) {
-    el.innerHTML = `<span class="status-dot"></span> en línea · Nivel ${userLevel}`;
-  } else if (tutorPhase === "assessment") {
-    el.innerHTML = `<span class="status-dot"></span> en línea · Evaluando nivel...`;
+    const levelNames = { A1: "Principiante", A2: "Elemental", B1: "Intermedio", B2: "Intermedio Alto", C1: "Avanzado" };
+    badge.textContent = userLevel;
+    badge.classList.add("evaluated");
+    label.textContent = `Nivel ${userLevel} — ${levelNames[userLevel] || ""}`;
+    desc.textContent = "Ve al Chat IA para comenzar tus lecciones personalizadas.";
+    startBtn.style.display = "none";
+    resetBtn.style.display = "inline-flex";
+    if (statusEl) statusEl.innerHTML = `<span class="status-dot"></span> en línea · Nivel ${userLevel}`;
   } else {
-    el.innerHTML = `<span class="status-dot"></span> en línea · Tutor de Inglés IA`;
+    badge.textContent = "?";
+    badge.classList.remove("evaluated");
+    label.textContent = "Sin evaluar";
+    desc.textContent = "Haz el test para que George adapte las lecciones a tu nivel.";
+    startBtn.style.display = "inline-flex";
+    resetBtn.style.display = "none";
+    if (statusEl) statusEl.innerHTML = `<span class="status-dot"></span> en línea · Tutor de Inglés IA`;
   }
 }
 
-function resetTutor() {
-  tutorPhase = "assessment";
-  userLevel = "";
-  assessmentStep = 0;
-  assessmentAnswers = [];
-  chatHistory = [];
-  saveTutorState();
-}
-
-function getSystemPrompt() {
-  if (tutorPhase === "assessment") {
-    return `You are George, a friendly AI English tutor for Spanish speakers. You are currently evaluating the user's English level.
-
-You must ask EXACTLY 4 questions, ONE AT A TIME. You are on question ${assessmentStep + 1} of 4.
-
-THE 4 QUESTIONS (ask only the current one):
-1. "Hi! I'm George, your English tutor. Let's start with a quick assessment. Tell me: How would you introduce yourself in English? (Just say your name, age, and what you do)"
-2. "Great! Now a grammar question: Can you complete this sentence? 'Yesterday, I ___ (go) to the store and ___ (buy) some groceries.' Write the full sentence."
-3. "Nice! Vocabulary time: What does the word 'deadline' mean? Can you use it in a sentence?"
-4. "Last one! Read this situation and answer: 'Your friend says: I've been feeling under the weather lately.' What does your friend mean? How would you respond to them?"
-
-RULES:
-- Ask ONLY question number ${assessmentStep + 1}. Do NOT skip ahead.
-- After each answer, give brief encouraging feedback (1 sentence) then ask the next question.
-- Use format: English text first, then [ES], then Spanish translation.
-- Keep feedback SHORT — max 2 sentences per language.
-- If this is question 1, start with the greeting and question 1.
-- Do NOT classify the level yet. Just ask the question.`;
-  }
-
-  if (tutorPhase === "classifying") {
-    return `You are George, an AI English tutor. You just finished a 4-question assessment. Analyze the user's answers and classify their level.
-
-USER'S ANSWERS:
-${assessmentAnswers.map((a, i) => `Q${i + 1}: ${a}`).join("\n")}
-
-TASK:
-1. Classify the user as: A1 (Beginner), A2 (Elementary), B1 (Intermediate), B2 (Upper-Intermediate), or C1 (Advanced).
-2. Explain briefly IN SPANISH why you gave that level.
-3. Then immediately start a micro-lesson appropriate for their level.
-
-LEVEL-BASED TEACHING STYLE:
-- A1-A2: Teach mostly in Spanish with English phrases. Simple vocabulary and grammar.
-- B1-B2: Teach mostly in English with Spanish support. More complex grammar and expressions.
-- C1: Teach entirely in English. Advanced topics, idioms, nuanced language.
-
-MICRO-LESSON FORMAT:
-- State the objective clearly
-- Brief explanation (2-3 sentences max)
-- 2 examples
-- 1 interactive exercise (ask the user to try something)
-
-FORMAT: English first, then [ES], then Spanish.
-Keep it concise. No long paragraphs.`;
-  }
-
-  // teaching & conversation phases
+function getChatSystemPrompt() {
   const levelStyle = {
     "A1": "Teach in Spanish with basic English words and phrases. Very simple. Always translate everything.",
     "A2": "Teach mostly in Spanish, introduce English sentences. Translate all English to Spanish.",
@@ -276,19 +228,28 @@ Keep it concise. No long paragraphs.`;
     "C1": "Teach entirely in English. No Spanish unless the user asks."
   };
 
-  return `You are George, a friendly and motivating AI English tutor. The user's level is ${userLevel || "B1"}.
+  if (!userLevel) {
+    return `You are George, a concise English tutor for Spanish speakers.
+
+RULES:
+1. Answer ONLY what was asked. No extras, no lists, no alternatives unless requested.
+2. Keep it to 1-2 sentences per language. Be direct.
+3. Format: English answer first, then [ES], then Spanish translation.
+4. Tell the user they should go to the "Level" tab to take the placement test so you can personalize lessons.
+NEVER give long lists or multiple options unless the user asks for them. Be short and precise.`;
+  }
+
+  return `You are George, a friendly and motivating AI English tutor. The user's level is ${userLevel}.
 
 TEACHING STYLE: ${levelStyle[userLevel] || levelStyle["B1"]}
 
 RULES:
 1. Answer ONLY what was asked. Be concise — 1-3 sentences per language max.
 2. If the user makes an error, correct it and explain WHY briefly.
-3. Dynamically adjust: if the user struggles, simplify. If they do well, challenge them more.
+3. Dynamically adjust difficulty: if the user struggles, simplify. If they do well, challenge more.
 4. Format: English first, then [ES], then Spanish translation.
 5. Include interactive exercises when appropriate — ask the user to practice.
 6. Be encouraging and motivating. Celebrate progress.
-7. If the user says "reiniciar" or "reset" or "new test", start a new assessment.
-
 NEVER give long lists or multiple options unless asked. Be short and precise.`;
 }
 
@@ -301,28 +262,23 @@ document.querySelectorAll(".nav-btn").forEach(btn => {
   btn.addEventListener("click", () => {
     const tab = btn.dataset.tab;
     if (tab === "chat") {
-      // Iniciar video de fondo al entrar al chat
       const bgVideo = document.getElementById("chat-bg-video");
       const hdrVideo = document.getElementById("aria-video");
       if (bgVideo) bgVideo.play().catch(() => {});
       if (hdrVideo) hdrVideo.play().catch(() => {});
       if (!chatGreeted) {
         chatGreeted = true;
-        if (userLevel && tutorPhase === "teaching") {
-          // Ya tiene nivel — saludo de continuación
-          const greeting = `Welcome back! Your level is ${userLevel}. Let's keep practicing!\n[ES]\n¡Bienvenido de vuelta! Tu nivel es ${userLevel}. ¡Sigamos practicando! (Escribe "reiniciar" para hacer el test de nuevo)`;
-          setTimeout(() => {
+        setTimeout(() => {
+          if (userLevel) {
+            const greeting = `Welcome! Your level is ${userLevel}. Let's start your lesson. What would you like to learn today?\n[ES]\n¡Bienvenido! Tu nivel es ${userLevel}. Comencemos tu lección. ¿Qué te gustaría aprender hoy?`;
             addMessage(greeting, "bot");
-            ariaSpeak(`Welcome back! Your level is ${userLevel}. Let's keep practicing!`);
-          }, 600);
-        } else {
-          // Primera vez o reset — iniciar evaluación
-          tutorPhase = "assessment";
-          assessmentStep = 0;
-          assessmentAnswers = [];
-          saveTutorState();
-          setTimeout(() => startAssessment(), 600);
-        }
+            ariaSpeak(`Welcome! Your level is ${userLevel}. Let's start your lesson.`);
+          } else {
+            const msg = `Hi! I'm George, your English tutor. Go to the "Level" tab first to take the placement test so I can personalize your lessons.\n[ES]\n¡Hola! Soy George, tu tutor de inglés. Ve a la pestaña "Level" primero para hacer el test de nivel y así personalizar tus lecciones.`;
+            addMessage(msg, "bot");
+            ariaSpeak("Hi! Go to the Level tab first to take the placement test.");
+          }
+        }, 400);
       }
     }
     document.querySelectorAll(".nav-btn").forEach(b => b.classList.remove("active"));
@@ -568,25 +524,9 @@ function addMessage(text, role, typing = false) {
   return wrap;
 }
 
-async function startAssessment() {
-  if (!apiKey) {
-    addMessage("Para usar el Chat con IA necesitas configurar tu API Key de Claude. Haz clic en ⚙️ arriba a la derecha.", "bot");
-    return;
-  }
-  const typingEl = addMessage("", "bot", true);
-  try {
-    const reply = await callClaude([], getSystemPrompt(), 300);
-    typingEl.remove();
-    addMessage(reply, "bot");
-    chatHistory.push({ role: "assistant", content: reply });
-    const englishPart = reply.includes("[ES]") ? reply.split("[ES]")[0].trim() : reply;
-    ariaSpeak(englishPart);
-  } catch (err) {
-    typingEl.remove();
-    addMessage(`Error: ${err.message}. Verifica tu API Key en ⚙️.`, "bot");
-  }
-}
-
+// ============================================================
+//  SHARED — callClaude helper
+// ============================================================
 async function callClaude(messages, systemPrompt, maxTokens = 250) {
   const res = await fetch("https://api.anthropic.com/v1/messages", {
     method: "POST",
@@ -609,48 +549,164 @@ async function callClaude(messages, systemPrompt, maxTokens = 250) {
   }
   const data = await res.json();
   let reply = data.content[0].text;
-
-  // Auto-traducción si no incluye [ES]
   if (!reply.includes("[ES]")) {
     try {
       const trRes = await fetch("https://api.anthropic.com/v1/messages", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "x-api-key": apiKey,
-          "anthropic-version": "2023-06-01",
-          "anthropic-dangerous-direct-browser-access": "true"
-        },
-        body: JSON.stringify({
-          model: "claude-haiku-4-5-20251001",
-          max_tokens: 200,
-          system: "Translate the following English text to natural Spanish. Only output the translation, nothing else.",
-          messages: [{ role: "user", content: reply }]
-        })
+        headers: { "Content-Type": "application/json", "x-api-key": apiKey, "anthropic-version": "2023-06-01", "anthropic-dangerous-direct-browser-access": "true" },
+        body: JSON.stringify({ model: "claude-haiku-4-5-20251001", max_tokens: 200, system: "Translate the following English text to natural Spanish. Only output the translation, nothing else.", messages: [{ role: "user", content: reply }] })
       });
-      if (trRes.ok) {
-        const trData = await trRes.json();
-        reply = reply + "\n[ES]\n" + trData.content[0].text;
-      }
+      if (trRes.ok) { const trData = await trRes.json(); reply = reply + "\n[ES]\n" + trData.content[0].text; }
     } catch { }
   }
   return reply;
 }
 
+// ============================================================
+//  LEVEL TEST — lógica de la pestaña Level
+// ============================================================
+const levelMessages = document.getElementById("level-messages");
+const levelInput    = document.getElementById("level-input");
+const levelChat     = document.getElementById("level-chat");
+const levelProgress = document.getElementById("level-progress");
+
+const LEVEL_QUESTIONS = [
+  "Hi! I'm George. Let's find your English level with 4 quick questions.\n\nQuestion 1: How would you introduce yourself in English? (Say your name, age, and what you do)\n[ES]\n¡Hola! Soy George. Vamos a descubrir tu nivel con 4 preguntas rápidas.\n\nPregunta 1: ¿Cómo te presentarías en inglés? (Di tu nombre, edad y a qué te dedicas)",
+  "Question 2: Complete this sentence:\n\"Yesterday, I ___ (go) to the store and ___ (buy) some groceries.\"\nWrite the full sentence.\n[ES]\nPregunta 2: Completa esta oración:\n\"Yesterday, I ___ (go) to the store and ___ (buy) some groceries.\"\nEscribe la oración completa.",
+  "Question 3: What does the word \"deadline\" mean? Can you use it in a sentence?\n[ES]\nPregunta 3: ¿Qué significa la palabra \"deadline\"? ¿Puedes usarla en una oración?",
+  "Last question! Your friend says: \"I've been feeling under the weather lately.\" What does your friend mean? How would you respond?\n[ES]\nÚltima pregunta: Tu amigo dice: \"I've been feeling under the weather lately.\" ¿Qué quiere decir? ¿Cómo le responderías?"
+];
+
+function addLevelMsg(text, role, typing = false) {
+  const el = document.createElement("div");
+  el.className = `level-msg ${role}${typing ? " typing" : ""}`;
+  if (typing) {
+    el.innerHTML = "<span></span><span></span><span></span>";
+  } else if (text.includes("[ES]")) {
+    const parts = text.split("[ES]");
+    el.innerHTML = `<div style="margin-bottom:6px">${parts[0].trim().replace(/\n/g, "<br>")}</div><div style="border-top:1px solid rgba(74,222,128,0.2);padding-top:6px;color:#8fc9a3;font-style:italic;font-size:0.82rem">${parts[1].trim().replace(/\n/g, "<br>")}</div>`;
+  } else {
+    el.textContent = text;
+  }
+  levelMessages.appendChild(el);
+  levelMessages.scrollTop = levelMessages.scrollHeight;
+  return el;
+}
+
+function updateLevelProgress() {
+  const fill = document.getElementById("level-progress-fill");
+  const text = document.getElementById("level-progress-text");
+  const pct = (levelStep / 4) * 100;
+  fill.style.width = pct + "%";
+  text.textContent = levelStep >= 4 ? "Evaluando resultado..." : `Pregunta ${levelStep + 1} de 4`;
+}
+
+document.getElementById("start-level-btn").addEventListener("click", () => {
+  if (!apiKey) {
+    toast("Configura tu API Key primero en ⚙️", "error");
+    return;
+  }
+  levelStep = 0;
+  levelAnswers = [];
+  levelHistory = [];
+  levelMessages.innerHTML = "";
+  levelChat.style.display = "block";
+  levelProgress.style.display = "block";
+  document.getElementById("start-level-btn").style.display = "none";
+  document.getElementById("reset-level-btn").style.display = "none";
+  updateLevelProgress();
+  addLevelMsg(LEVEL_QUESTIONS[0], "bot");
+});
+
+document.getElementById("reset-level-btn").addEventListener("click", () => {
+  userLevel = "";
+  localStorage.removeItem("tutor_level");
+  chatGreeted = false;
+  chatHistory = [];
+  chatContainer.innerHTML = "";
+  updateLevelUI();
+  document.getElementById("start-level-btn").click();
+});
+
+async function sendLevelAnswer(text) {
+  text = text.trim();
+  if (!text) return;
+  levelInput.value = "";
+  levelInput.disabled = true;
+
+  addLevelMsg(text, "user");
+  levelAnswers.push(text);
+  levelStep++;
+  updateLevelProgress();
+
+  if (levelStep < 4) {
+    // Mostrar siguiente pregunta con pequeña pausa
+    const typingEl = addLevelMsg("", "bot", true);
+    await new Promise(r => setTimeout(r, 600));
+    typingEl.remove();
+    addLevelMsg(LEVEL_QUESTIONS[levelStep], "bot");
+    levelInput.disabled = false;
+    levelInput.focus();
+  } else {
+    // Completó 4 preguntas — clasificar con IA
+    const typingEl = addLevelMsg("", "bot", true);
+    try {
+      const classifyPrompt = `You are George, an English tutor. Analyze these 4 answers from a Spanish speaker and classify their English level.
+
+ANSWERS:
+Q1 (Introduction): ${levelAnswers[0]}
+Q2 (Grammar - past tense): ${levelAnswers[1]}
+Q3 (Vocabulary - "deadline"): ${levelAnswers[2]}
+Q4 (Comprehension - "under the weather"): ${levelAnswers[3]}
+
+TASK:
+1. Classify as: A1 (Beginner), A2 (Elementary), B1 (Intermediate), B2 (Upper-Intermediate), or C1 (Advanced).
+2. Start your response with the level like: "Your level is B1!"
+3. Explain briefly IN SPANISH why (2-3 sentences max about strengths and areas to improve).
+4. End with an encouraging message about what they'll learn next in the Chat.
+
+Format: English first, then [ES], then Spanish.`;
+
+      const reply = await callClaude([{ role: "user", content: "Classify my level based on my test answers." }], classifyPrompt, 400);
+      typingEl.remove();
+      addLevelMsg(reply, "bot");
+
+      // Extraer nivel
+      const match = reply.match(/\b(A1|A2|B1|B2|C1)\b/);
+      if (match) {
+        userLevel = match[1];
+        localStorage.setItem("tutor_level", userLevel);
+        chatGreeted = false;
+        chatHistory = [];
+        chatContainer.innerHTML = "";
+      }
+      updateLevelUI();
+      levelInput.disabled = false;
+
+      // Ocultar input del level, mostrar botón de repetir
+      setTimeout(() => {
+        levelChat.querySelector(".level-input-area").style.display = "none";
+        document.getElementById("reset-level-btn").style.display = "inline-flex";
+      }, 500);
+
+    } catch (err) {
+      typingEl.remove();
+      addLevelMsg(`Error: ${err.message}. Verifica tu API Key en ⚙️.`, "bot");
+      levelInput.disabled = false;
+    }
+  }
+}
+
+document.getElementById("level-send-btn").addEventListener("click", () => sendLevelAnswer(levelInput.value));
+levelInput.addEventListener("keydown", e => { if (e.key === "Enter") sendLevelAnswer(levelInput.value); });
+
+// ============================================================
+//  CHAT — solo enseñanza (usa nivel de Level tab)
+// ============================================================
 async function sendMessage(text) {
   text = text.trim();
   if (!text) return;
   chatInput.value = "";
-
-  // Comando reiniciar
-  if (/^(reiniciar|reset|new test|nuevo test)$/i.test(text)) {
-    resetTutor();
-    chatContainer.innerHTML = "";
-    chatGreeted = false;
-    addMessage("Reiniciando evaluación...\n[ES]\nRestarting assessment...", "bot");
-    setTimeout(() => startAssessment(), 800);
-    return;
-  }
 
   addMessage(text, "user");
   chatHistory.push({ role: "user", content: text });
@@ -660,49 +716,17 @@ async function sendMessage(text) {
     return;
   }
 
-  // Registrar respuesta durante evaluación
-  if (tutorPhase === "assessment") {
-    assessmentAnswers.push(text);
-    assessmentStep++;
-    saveTutorState();
-
-    // Si completó las 4 preguntas → clasificar
-    if (assessmentStep >= 4) {
-      tutorPhase = "classifying";
-      saveTutorState();
-    }
-  }
-
   const typingEl = addMessage("", "bot", true);
   const ariaSvg = document.getElementById("aria-svg");
   if (ariaSvg) ariaSvg.classList.add("speaking");
 
   try {
-    let reply;
-
-    if (tutorPhase === "classifying") {
-      // Fase 2: Clasificar nivel y dar primera lección
-      reply = await callClaude(chatHistory, getSystemPrompt(), 500);
-
-      // Extraer nivel de la respuesta
-      const levelMatch = reply.match(/\b(A1|A2|B1|B2|C1)\b/);
-      if (levelMatch) {
-        userLevel = levelMatch[1];
-        tutorPhase = "teaching";
-        saveTutorState();
-      }
-    } else {
-      // Fases 1, 3 y 4: evaluación, enseñanza, conversación
-      const maxTk = tutorPhase === "assessment" ? 300 : 250;
-      reply = await callClaude(chatHistory, getSystemPrompt(), maxTk);
-    }
-
+    const reply = await callClaude(chatHistory, getChatSystemPrompt(), 250);
     typingEl.remove();
     addMessage(reply, "bot");
     chatHistory.push({ role: "assistant", content: reply });
     const englishPart = reply.includes("[ES]") ? reply.split("[ES]")[0].trim() : reply;
     ariaSpeak(englishPart);
-
   } catch (err) {
     if (ariaSvg) ariaSvg.classList.remove("speaking");
     typingEl.remove();
@@ -843,4 +867,4 @@ document.querySelectorAll(".chip").forEach(chip => {
 })();
 
 // Mostrar nivel guardado al cargar
-updateTutorStatus();
+updateLevelUI();

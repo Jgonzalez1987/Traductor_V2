@@ -1166,6 +1166,158 @@ h1 {
 ::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.2); }
 
 /* ============================================================
+   LEVEL TEST
+   ============================================================ */
+.level-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 24px;
+  padding: 20px 0;
+  text-align: center;
+}
+.level-header h1 { margin-bottom: 6px; }
+.level-header .subtitle { color: var(--muted); font-size: 0.9rem; }
+
+.level-badge-area {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+}
+.level-badge {
+  width: 100px;
+  height: 100px;
+  border-radius: 50%;
+  background: var(--glass-b);
+  border: 3px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 2rem;
+  font-weight: 900;
+  color: var(--muted);
+  transition: all 0.5s;
+}
+.level-badge.evaluated {
+  border-color: var(--green);
+  color: var(--green);
+  background: rgba(74,222,128,0.08);
+  box-shadow: 0 0 40px rgba(74,222,128,0.2);
+}
+.level-label {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--text);
+}
+.level-desc {
+  color: var(--muted);
+  font-size: 0.85rem;
+  max-width: 320px;
+  line-height: 1.5;
+}
+
+.level-progress {
+  width: 100%;
+  max-width: 400px;
+}
+.level-progress-bar {
+  height: 6px;
+  background: var(--glass-b);
+  border-radius: 50px;
+  overflow: hidden;
+}
+.level-progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--purple), var(--green));
+  border-radius: 50px;
+  transition: width 0.4s ease;
+}
+.level-progress-text {
+  display: block;
+  margin-top: 8px;
+  font-size: 0.78rem;
+  color: var(--muted);
+}
+
+.level-chat {
+  width: 100%;
+  max-width: 500px;
+  background: var(--glass);
+  border: 1px solid var(--border);
+  border-radius: var(--r-card);
+  overflow: hidden;
+}
+.level-messages {
+  max-height: 300px;
+  overflow-y: auto;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.level-msg {
+  padding: 10px 14px;
+  border-radius: 16px;
+  font-size: 0.88rem;
+  line-height: 1.5;
+  max-width: 90%;
+  word-wrap: break-word;
+}
+.level-msg.bot {
+  background: rgba(74,222,128,0.1);
+  border: 1px solid rgba(74,222,128,0.15);
+  color: var(--text);
+  align-self: flex-start;
+  border-bottom-left-radius: 4px;
+}
+.level-msg.user {
+  background: var(--glass-h);
+  border: 1px solid var(--border);
+  color: var(--text);
+  align-self: flex-end;
+  border-bottom-right-radius: 4px;
+}
+.level-msg.typing {
+  display: flex;
+  gap: 4px;
+  padding: 12px 18px;
+}
+.level-msg.typing span {
+  width: 7px; height: 7px;
+  background: var(--green);
+  border-radius: 50%;
+  animation: dotBounce 1.2s infinite ease-in-out;
+}
+.level-msg.typing span:nth-child(2) { animation-delay: 0.15s; }
+.level-msg.typing span:nth-child(3) { animation-delay: 0.3s; }
+
+.level-input-area {
+  display: flex;
+  gap: 8px;
+  padding: 10px 12px;
+  border-top: 1px solid var(--border);
+  background: rgba(0,0,0,0.2);
+}
+.level-input-area input {
+  flex: 1;
+  background: transparent;
+  border: none;
+  color: var(--text);
+  font-size: 0.88rem;
+  font-family: inherit;
+  outline: none;
+}
+.level-input-area input::placeholder { color: var(--muted); }
+
+.level-actions {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+/* ============================================================
    CHAT FULLSCREEN — se ajusta solo a la pantalla visible
    ============================================================ */
 #tab-chat.tab.active { padding: 0; }

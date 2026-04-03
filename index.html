@@ -14,7 +14,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="style.css?v=6" />
+  <link rel="stylesheet" href="style.css?v=7" />
 </head>
 <body>
 
@@ -43,6 +43,9 @@
       </button>
       <button class="nav-btn" data-tab="quiz">
         <span class="nav-icon">🎯</span> Quiz
+      </button>
+      <button class="nav-btn" data-tab="level">
+        <span class="nav-icon">📊</span> Level
       </button>
       <button class="nav-btn" data-tab="chat">
         <span class="nav-icon">💬</span> Chat IA
@@ -187,6 +190,48 @@
       </div>
     </section>
 
+    <!-- ===== LEVEL TEST ===== -->
+    <section id="tab-level" class="tab hidden">
+      <div class="level-wrap">
+        <div class="level-header">
+          <h1>Tu Nivel de Inglés</h1>
+          <p class="subtitle">Responde 4 preguntas para conocer tu nivel</p>
+        </div>
+
+        <!-- Badge de nivel actual -->
+        <div class="level-badge-area" id="level-badge-area">
+          <div class="level-badge" id="level-badge">?</div>
+          <div class="level-label" id="level-label">Sin evaluar</div>
+          <p class="level-desc" id="level-desc">Haz el test para que George adapte las lecciones a tu nivel.</p>
+        </div>
+
+        <!-- Progreso del test -->
+        <div class="level-progress" id="level-progress" style="display:none;">
+          <div class="level-progress-bar">
+            <div class="level-progress-fill" id="level-progress-fill" style="width:0%"></div>
+          </div>
+          <span class="level-progress-text" id="level-progress-text">Pregunta 1 de 4</span>
+        </div>
+
+        <!-- Área de conversación del test -->
+        <div class="level-chat" id="level-chat" style="display:none;">
+          <div class="level-messages" id="level-messages"></div>
+          <div class="level-input-area">
+            <input type="text" id="level-input" placeholder="Escribe tu respuesta..." autocomplete="off" />
+            <button id="level-send-btn" class="send-btn" title="Enviar">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+            </button>
+          </div>
+        </div>
+
+        <!-- Botones de acción -->
+        <div class="level-actions">
+          <button class="btn-primary" id="start-level-btn">Comenzar Test</button>
+          <button class="btn-ghost" id="reset-level-btn" style="display:none;">Repetir Test</button>
+        </div>
+      </div>
+    </section>
+
     <!-- ===== CHAT ===== -->
     <section id="tab-chat" class="tab hidden">
       <div class="wa-chat-wrap">
@@ -231,10 +276,10 @@
             </button>
           </div>
           <div class="suggestions">
-            <button class="chip">Reiniciar test</button>
+            <button class="chip">Dame una lección</button>
             <button class="chip">Corrige: I go to school yesterday</button>
             <button class="chip">¿Cómo se dice "sin embargo"?</button>
-            <button class="chip">Dame una lección</button>
+            <button class="chip">Phrasal verbs comunes</button>
           </div>
         </div>
 
@@ -243,7 +288,7 @@
 
   </main>
 
-  <script src="app.js?v=5"></script>
+  <script src="app.js?v=6"></script>
   <script>
     // Registrar Service Worker para PWA
     if ('serviceWorker' in navigator) {
