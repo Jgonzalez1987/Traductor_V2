@@ -758,8 +758,12 @@ updateLevelUI();
         messages: [{ role: "user", content: text }]
       })
     });
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const data = await res.json();
+    if (!res.ok) {
+      const errMsg = data?.error?.message || data?.error || `HTTP ${res.status}`;
+      throw new Error(errMsg);
+    }
+    if (!data.content || !data.content[0]) throw new Error("Respuesta inesperada del servidor");
     return data.content[0].text.trim();
   }
 
@@ -773,8 +777,8 @@ updateLevelUI();
     try {
       const translation = await translateText(original);
       finalizeEntry(entry, translation);
-    } catch {
-      finalizeEntry(entry, "— error al traducir —");
+    } catch (err) {
+      finalizeEntry(entry, `⚠️ ${err.message}`);
     }
 
     trTranslating = false;
