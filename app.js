@@ -695,10 +695,13 @@ updateLevelUI();
   const trLangSelect = document.getElementById("tr-lang-select");
   const trClearBtn   = document.getElementById("tr-clear-btn");
 
-  let trIsListening  = false;
-  let trRecognition  = null;
-  let trQueue        = [];
-  let trTranslating  = false;
+  let trIsListening   = false;
+  let trRecognition   = null;
+  let trBuffer        = [];      // acumula segmentos finales antes de traducir
+  let trDebounceTimer = null;    // espera pausa en el habla
+  let trTranslating   = false;
+  const DEBOUNCE_MS   = 2500;   // espera 2.5s de silencio antes de traducir
+  const RETRY_MS      = 15000;  // espera 15s antes de reintentar si hay rate limit
 
   // Build recognition instance
   if (SpeechRecognition) {
@@ -713,9 +716,11 @@ updateLevelUI();
         if (r.isFinal) {
           const text = r[0].transcript.trim();
           if (text) {
-            trQueue.push(text);
+            trBuffer.push(text);
             trInterimEl.textContent = "";
-            processQueue();
+            // Resetea el timer de debounce con cada segmento nuevo
+            clearTimeout(trDebounceTimer);
+            trDebounceTimer = setTimeout(flushBuffer, DEBOUNCE_MS);
           }
         } else {
           interim += r[0].transcript;
@@ -728,17 +733,14 @@ updateLevelUI();
     };
 
     trRecognition.onerror = (e) => {
-      if (e.error === "no-speech") return; // silencio normal — ignorar
+      if (e.error === "no-speech") return;
       if (e.error === "not-allowed") {
         trStatus.textContent = "Permite el acceso al micrófono en tu navegador";
         trStatus.classList.remove("active");
         stopTr();
-        return;
       }
-      // Otros errores: reintentar si sigue activo
     };
 
-    // Auto-reiniciar para mantener escucha continua
     trRecognition.onend = () => {
       if (trIsListening) {
         try { trRecognition.start(); } catch (_) {}
@@ -746,43 +748,84 @@ updateLevelUI();
     };
   }
 
-  // ---- Traducción via Claude proxy ----
-  async function translateText(text) {
+  // Junta todo el buffer y lanza UNA sola traducción
+  function flushBuffer() {
+    if (trBuffer.length === 0) return;
+    const fullText = trBuffer.join(" ");
+    trBuffer = [];
+    trInterimWrap.classList.add("hidden");
+    trInterimEl.textContent = "";
+    scheduleTranslation(fullText);
+  }
+
+  // ---- Traducción via Claude proxy con reintento automático ----
+  async function translateText(text, attempt = 1) {
     const res = await fetch(`${API_BASE}/api/chat`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         model: "claude-haiku-4-5-20251001",
-        max_tokens: 400,
-        system: "You are a translation engine. Rules: 1) Output ONLY the Spanish translation. 2) No explanations, no notes, no alternatives, no punctuation added. 3) If the input is already Spanish, output it as-is. 4) Never greet, never comment, never add anything beyond the raw translation.",
+        max_tokens: 300,
+        system: "You are a translation engine. Rules: 1) Output ONLY the Spanish translation. 2) No explanations, no notes, no alternatives. 3) If the input is already Spanish, output it as-is. 4) Never greet or comment.",
         messages: [{ role: "user", content: text }]
       })
     });
     const data = await res.json();
-    if (!res.ok) {
-      const errMsg = data?.error?.message || data?.error || `HTTP ${res.status}`;
-      throw new Error(errMsg);
+
+    // Rate limit → esperar y reintentar automáticamente
+    if (res.status === 429) {
+      const waitSec = Math.min(RETRY_MS * attempt / 1000, 60);
+      throw new RateLimitError(waitSec);
     }
-    if (!data.content || !data.content[0]) throw new Error("Respuesta inesperada del servidor");
+
+    if (!res.ok) {
+      throw new Error(data?.error?.message || data?.error || `HTTP ${res.status}`);
+    }
+    if (!data.content?.[0]) throw new Error("Respuesta inesperada del servidor");
     return data.content[0].text.trim();
   }
 
-  async function processQueue() {
-    if (trTranslating || trQueue.length === 0) return;
-    trTranslating = true;
+  class RateLimitError extends Error {
+    constructor(waitSec) { super(`rate_limit`); this.waitSec = waitSec; }
+  }
 
-    const original = trQueue.shift();
+  async function scheduleTranslation(original, attempt = 1) {
+    if (trTranslating) {
+      // Ya hay una traducción en curso → encolar de nuevo tras un momento
+      setTimeout(() => scheduleTranslation(original, attempt), 1000);
+      return;
+    }
+    trTranslating = true;
     const entry = addEntry(original);
 
     try {
-      const translation = await translateText(original);
+      const translation = await translateText(original, attempt);
       finalizeEntry(entry, translation);
     } catch (err) {
+      if (err instanceof RateLimitError) {
+        const sec = Math.round(err.waitSec);
+        setStatus(`⏳ Límite alcanzado — reintentando en ${sec}s...`, true);
+        updateEntryStatus(entry, `⏳ Traduciendo en ${sec}s...`);
+        await new Promise(r => setTimeout(r, err.waitSec * 1000));
+        trTranslating = false;
+        scheduleTranslation(original, attempt + 1);
+        return;
+      }
       finalizeEntry(entry, `⚠️ ${err.message}`);
     }
 
     trTranslating = false;
-    if (trQueue.length > 0) processQueue();
+    setStatus(trIsListening ? "🔴 Escuchando..." : "Selecciona idioma y presiona el micrófono", trIsListening);
+  }
+
+  function setStatus(text, active = false) {
+    trStatus.textContent = text;
+    trStatus.classList.toggle("active", active);
+  }
+
+  function updateEntryStatus(exchange, text) {
+    const textEl = exchange.querySelector(".tr-bubble-es .tr-bubble-text");
+    if (textEl) textEl.textContent = text;
   }
 
   const LANG_NAMES = {
@@ -842,18 +885,20 @@ updateLevelUI();
     trRecognition.lang = trLangSelect.value;
     trIsListening = true;
     trMicBtn.classList.add("listening");
-    trStatus.textContent = "🔴 Escuchando...";
-    trStatus.classList.add("active");
+    setStatus("🔴 Escuchando...", true);
     trInterimWrap.classList.add("hidden");
     trInterimEl.textContent = "";
+    trBuffer = [];
+    clearTimeout(trDebounceTimer);
     try { trRecognition.start(); } catch (_) {}
   }
 
   function stopTr() {
     trIsListening = false;
+    clearTimeout(trDebounceTimer);
+    flushBuffer(); // traduce lo que quedó pendiente al parar
     trMicBtn.classList.remove("listening");
-    trStatus.textContent = "Selecciona idioma y presiona el micrófono";
-    trStatus.classList.remove("active");
+    setStatus("Selecciona idioma y presiona el micrófono", false);
     trInterimWrap.classList.add("hidden");
     trInterimEl.textContent = "";
     try { trRecognition.stop(); } catch (_) {}
@@ -874,7 +919,8 @@ updateLevelUI();
 
   trClearBtn.addEventListener("click", () => {
     trLog.innerHTML = "";
-    trQueue = [];
+    trBuffer = [];
+    clearTimeout(trDebounceTimer);
     trInterimEl.textContent = "";
     trInterimWrap.classList.add("hidden");
   });
