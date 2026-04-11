@@ -953,51 +953,109 @@ updateLevelUI();
   function readTranslation(text, lang, btn) {
     synth.cancel();
 
+    // Si ElevenLabs está activo → soporta todos los idiomas automáticamente
+    if (elevenLabsEnabled) {
+      speakElevenLabsTr(text, btn);
+      return;
+    }
+
+    // Fallback: navegador
     function speak(voices) {
       const utt  = new SpeechSynthesisUtterance(text);
-      utt.lang   = lang;           // el navegador usará este idioma
+      utt.lang   = lang;
       utt.rate   = 0.9;
       utt.pitch  = 1;
       utt.volume = 1;
 
-      // Intentar encontrar la mejor voz, pero NO bloquear si no hay
       const base  = lang.split("-")[0].toLowerCase();
       const voice = voices.find(v => v.lang.toLowerCase() === lang.toLowerCase())
                  || voices.find(v => v.lang.toLowerCase().startsWith(base))
                  || null;
       if (voice) utt.voice = voice;
-      // Sin voz exacta → el navegador igual intenta con utt.lang
 
       if (btn) {
         utt.onstart = () => btn.classList.add("speaking");
         utt.onend   = () => btn.classList.remove("speaking");
         utt.onerror = (e) => {
           btn.classList.remove("speaking");
-          // Solo avisar si el error es específico del idioma
           if (e.error === "language-unavailable" || e.error === "voice-unavailable") {
-            toast("Este idioma no tiene voz en tu navegador. Prueba en Edge.", "default");
+            showVoiceInstallGuide(lang);
           }
         };
       }
       synth.speak(utt);
+
+      // Chrome a veces no dispara onerror — detectar silencio tras 800ms
+      setTimeout(() => {
+        if (!synth.speaking && !synth.pending) showVoiceInstallGuide(lang);
+      }, 800);
     }
 
     const voices = synth.getVoices();
     if (voices.length > 0) {
       speak(voices);
     } else {
-      // Voces aún no cargadas — escuchar el evento y también reintentar por si no dispara
       let fired = false;
       synth.onvoiceschanged = () => {
-        if (fired) return;
-        fired = true;
+        if (fired) return; fired = true;
         synth.onvoiceschanged = null;
         speak(synth.getVoices());
       };
-      setTimeout(() => {
-        if (!fired) { fired = true; speak(synth.getVoices()); }
-      }, 500);
+      setTimeout(() => { if (!fired) { fired = true; speak(synth.getVoices()); } }, 500);
     }
+  }
+
+  // ElevenLabs TTS para el traductor (multilingual)
+  async function speakElevenLabsTr(text, btn) {
+    if (btn) btn.classList.add("speaking");
+    try {
+      const res = await fetch(`${API_BASE}/api/tts`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text })
+      });
+      if (!res.ok) throw new Error("TTS error");
+      const blob = await res.blob();
+      const url  = URL.createObjectURL(blob);
+      const audio = new Audio(url);
+      audio.onended = () => { if (btn) btn.classList.remove("speaking"); URL.revokeObjectURL(url); };
+      audio.onerror = () => { if (btn) btn.classList.remove("speaking"); };
+      await audio.play();
+    } catch {
+      if (btn) btn.classList.remove("speaking");
+    }
+  }
+
+  // Guía para instalar voces según el sistema operativo
+  function showVoiceInstallGuide(lang) {
+    const isWindows = navigator.userAgent.includes("Windows");
+    const isMac     = navigator.userAgent.includes("Mac");
+    const isAndroid = navigator.userAgent.includes("Android");
+
+    let msg = "";
+    if (isWindows) {
+      msg = "Para activar este idioma: Configuración → Hora e idioma → Idioma y región → Agrega el idioma y descarga el paquete de voz.";
+    } else if (isMac) {
+      msg = "Para activar este idioma: Ajustes del sistema → Accesibilidad → Contenido hablado → Voces del sistema → elige el idioma.";
+    } else if (isAndroid) {
+      msg = "Para activar este idioma: Ajustes → Administración general → Idioma → Texto a voz → descarga el idioma.";
+    } else {
+      msg = "Tu navegador no tiene voz para este idioma. Instala el paquete de idioma en tu sistema operativo.";
+    }
+
+    // Mostrar panel informativo en pantalla
+    const existing = document.getElementById("tr-voice-guide");
+    if (existing) existing.remove();
+
+    const panel = document.createElement("div");
+    panel.id = "tr-voice-guide";
+    panel.className = "tr-voice-guide";
+    panel.innerHTML = `
+      <div class="tr-voice-guide-icon">🔈</div>
+      <div class="tr-voice-guide-text">${msg}</div>
+      <button class="tr-voice-guide-close" onclick="this.parentElement.remove()">✕</button>
+    `;
+    document.getElementById("tr-body").prepend(panel);
   }
 
   function escapeHtml(str) {

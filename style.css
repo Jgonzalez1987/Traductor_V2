@@ -1831,3 +1831,46 @@ body:has(#tab-chat.tab.active) .wa-chat-wrap {
 @media (hover: none) {
   .tr-speak-btn { opacity: 0.7; }
 }
+
+/* --- Panel guía de instalación de voz --- */
+.tr-voice-guide {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  background: rgba(124,111,255,0.1);
+  border: 1px solid rgba(124,111,255,0.3);
+  border-radius: var(--r-card);
+  padding: 14px 16px;
+  margin-bottom: 12px;
+  animation: pageIn 0.3s ease;
+  position: relative;
+}
+
+.tr-voice-guide-icon {
+  font-size: 1.4rem;
+  flex-shrink: 0;
+  line-height: 1;
+  padding-top: 2px;
+}
+
+.tr-voice-guide-text {
+  font-size: 0.82rem;
+  color: var(--text);
+  line-height: 1.55;
+  flex: 1;
+}
+
+.tr-voice-guide-close {
+  position: absolute;
+  top: 8px;
+  right: 10px;
+  background: none;
+  border: none;
+  color: var(--muted);
+  cursor: pointer;
+  font-size: 0.8rem;
+  padding: 2px 4px;
+  line-height: 1;
+}
+
+.tr-voice-guide-close:hover { color: var(--text); }
