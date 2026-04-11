@@ -714,6 +714,7 @@ updateLevelUI();
   let trBuffer        = [];
   let trDebounceTimer = null;
   let trTranslating   = false;
+  let trSeen          = new Set(); // evita duplicados en Android
   const DEBOUNCE_MS   = 2500;
   const RETRY_MS      = 15000;
 
@@ -729,10 +730,11 @@ updateLevelUI();
         const r = e.results[i];
         if (r.isFinal) {
           const text = r[0].transcript.trim();
-          if (text) {
+          // Ignorar si ya lo procesamos (Android repite al reiniciarse)
+          if (text && !trSeen.has(text)) {
+            trSeen.add(text);
             trBuffer.push(text);
             trInterimEl.textContent = "";
-            // Resetea el timer de debounce con cada segmento nuevo
             clearTimeout(trDebounceTimer);
             trDebounceTimer = setTimeout(flushBuffer, DEBOUNCE_MS);
           }
@@ -1081,6 +1083,7 @@ updateLevelUI();
     trInterimWrap.classList.add("hidden");
     trInterimEl.textContent = "";
     trBuffer = [];
+    trSeen   = new Set();
     clearTimeout(trDebounceTimer);
     try { trRecognition.start(); } catch (_) {}
   }
@@ -1103,6 +1106,7 @@ updateLevelUI();
   trClearBtn.addEventListener("click", () => {
     trLog.innerHTML = "";
     trBuffer = [];
+    trSeen   = new Set();
     clearTimeout(trDebounceTimer);
     trInterimEl.textContent = "";
     trInterimWrap.classList.add("hidden");
