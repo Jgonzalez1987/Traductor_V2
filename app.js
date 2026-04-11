@@ -827,3 +827,180 @@ document.querySelectorAll(".chip").forEach(chip => {
 
 // Mostrar nivel guardado al cargar
 updateLevelUI();
+
+// ============================================================
+//  TRADUCTOR — Escucha en cualquier idioma, traduce al español
+// ============================================================
+(function initTraductor() {
+  const trMicBtn     = document.getElementById("tr-mic-btn");
+  const trStatus     = document.getElementById("tr-status");
+  const trInterimEl  = document.getElementById("tr-interim");
+  const trInterimWrap= document.getElementById("tr-interim-wrap");
+  const trLog        = document.getElementById("tr-log");
+  const trLangSelect = document.getElementById("tr-lang-select");
+  const trClearBtn   = document.getElementById("tr-clear-btn");
+
+  let trIsListening  = false;
+  let trRecognition  = null;
+  let trQueue        = [];
+  let trTranslating  = false;
+
+  // Build recognition instance
+  if (SpeechRecognition) {
+    trRecognition = new SpeechRecognition();
+    trRecognition.continuous      = true;
+    trRecognition.interimResults  = true;
+
+    trRecognition.onresult = (e) => {
+      let interim = "";
+      for (let i = e.resultIndex; i < e.results.length; i++) {
+        const r = e.results[i];
+        if (r.isFinal) {
+          const text = r[0].transcript.trim();
+          if (text) {
+            trQueue.push(text);
+            trInterimEl.textContent = "";
+            processQueue();
+          }
+        } else {
+          interim += r[0].transcript;
+        }
+      }
+      if (interim) {
+        trInterimWrap.classList.remove("hidden");
+        trInterimEl.textContent = interim;
+      }
+    };
+
+    trRecognition.onerror = (e) => {
+      if (e.error === "no-speech") return; // silencio normal — ignorar
+      if (e.error === "not-allowed") {
+        trStatus.textContent = "Permite el acceso al micrófono en tu navegador";
+        trStatus.classList.remove("active");
+        stopTr();
+        return;
+      }
+      // Otros errores: reintentar si sigue activo
+    };
+
+    // Auto-reiniciar para mantener escucha continua
+    trRecognition.onend = () => {
+      if (trIsListening) {
+        try { trRecognition.start(); } catch (_) {}
+      }
+    };
+  }
+
+  // ---- Traducción via Claude proxy ----
+  async function translateText(text) {
+    const res = await fetch(`${API_BASE}/api/chat`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model: "claude-haiku-4-5-20251001",
+        max_tokens: 400,
+        system: "Translate the following text to Spanish. Output only the Spanish translation, nothing else. Preserve the original meaning and tone.",
+        messages: [{ role: "user", content: text }]
+      })
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data = await res.json();
+    return data.content[0].text.trim();
+  }
+
+  async function processQueue() {
+    if (trTranslating || trQueue.length === 0) return;
+    trTranslating = true;
+
+    const original = trQueue.shift();
+    const entry = addEntry(original);
+
+    try {
+      const translation = await translateText(original);
+      finalizeEntry(entry, translation);
+    } catch {
+      finalizeEntry(entry, "— error al traducir —");
+    }
+
+    trTranslating = false;
+    if (trQueue.length > 0) processQueue();
+  }
+
+  function addEntry(original) {
+    const div = document.createElement("div");
+    div.className = "tr-entry pending";
+    div.innerHTML = `
+      <div class="tr-original">${escapeHtml(original)}</div>
+      <div class="tr-arrow">→</div>
+      <div class="tr-translation translating">traduciendo...</div>
+    `;
+    trLog.insertBefore(div, trLog.firstChild);
+    return div;
+  }
+
+  function finalizeEntry(entry, translation) {
+    entry.classList.remove("pending");
+    const el = entry.querySelector(".tr-translation");
+    if (el) {
+      el.textContent = translation;
+      el.classList.remove("translating");
+    }
+  }
+
+  function escapeHtml(str) {
+    return str.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+  }
+
+  // ---- Controles ----
+  function startTr() {
+    if (!trRecognition) {
+      toast("Tu navegador no soporta reconocimiento de voz. Usa Chrome o Edge.", "default");
+      return;
+    }
+    trRecognition.lang = trLangSelect.value;
+    trIsListening = true;
+    trMicBtn.classList.add("listening");
+    trStatus.textContent = "Escuchando — habla ahora";
+    trStatus.classList.add("active");
+    trInterimWrap.classList.add("hidden");
+    trInterimEl.textContent = "";
+    try { trRecognition.start(); } catch (_) {}
+  }
+
+  function stopTr() {
+    trIsListening = false;
+    trMicBtn.classList.remove("listening");
+    trStatus.textContent = "Presiona el micrófono para comenzar";
+    trStatus.classList.remove("active");
+    trInterimWrap.classList.add("hidden");
+    trInterimEl.textContent = "";
+    try { trRecognition.stop(); } catch (_) {}
+  }
+
+  trMicBtn.addEventListener("click", () => {
+    trIsListening ? stopTr() : startTr();
+  });
+
+  // Cambiar idioma mientras escucha → reiniciar reconocimiento
+  trLangSelect.addEventListener("change", () => {
+    if (trIsListening) {
+      try { trRecognition.stop(); } catch (_) {}
+      trRecognition.lang = trLangSelect.value;
+      setTimeout(() => { try { trRecognition.start(); } catch (_) {} }, 200);
+    }
+  });
+
+  trClearBtn.addEventListener("click", () => {
+    trLog.innerHTML = "";
+    trQueue = [];
+    trInterimEl.textContent = "";
+    trInterimWrap.classList.add("hidden");
+  });
+
+  // Detener escucha al cambiar de pestaña
+  document.querySelectorAll(".nav-btn").forEach(btn => {
+    btn.addEventListener("click", () => {
+      if (btn.dataset.tab !== "traductor" && trIsListening) stopTr();
+    });
+  });
+})();

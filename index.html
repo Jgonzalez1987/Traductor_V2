@@ -46,6 +46,9 @@
       <button class="nav-btn" data-tab="chat">
         <span class="nav-icon">💬</span> Chat IA
       </button>
+      <button class="nav-btn" data-tab="traductor">
+        <span class="nav-icon">🌍</span> Traductor
+      </button>
     </nav>
 
   </header>
@@ -231,6 +234,65 @@
         </div>
 
       </div><!-- /wa-chat-wrap -->
+    </section>
+
+    <!-- ===== TRADUCTOR ===== -->
+    <section id="tab-traductor" class="tab hidden">
+      <div class="page-header">
+        <div class="page-title-wrap">
+          <h1>Traductor</h1>
+          <p class="subtitle">Escucha cualquier idioma y traduce al español en tiempo real</p>
+        </div>
+      </div>
+
+      <!-- Language selector -->
+      <div class="tr-lang-row">
+        <span class="tr-lang-label">Idioma que escuchas</span>
+        <select id="tr-lang-select" class="tr-lang-select">
+          <option value="en-US">🇺🇸 Inglés</option>
+          <option value="fr-FR">🇫🇷 Francés</option>
+          <option value="de-DE">🇩🇪 Alemán</option>
+          <option value="pt-BR">🇧🇷 Portugués</option>
+          <option value="it-IT">🇮🇹 Italiano</option>
+          <option value="zh-CN">🇨🇳 Chino (Mandarín)</option>
+          <option value="ja-JP">🇯🇵 Japonés</option>
+          <option value="ko-KR">🇰🇷 Coreano</option>
+          <option value="ar-SA">🇸🇦 Árabe</option>
+          <option value="ru-RU">🇷🇺 Ruso</option>
+          <option value="hi-IN">🇮🇳 Hindi</option>
+          <option value="nl-NL">🇳🇱 Holandés</option>
+        </select>
+      </div>
+
+      <!-- Mic button + status -->
+      <div class="tr-mic-area">
+        <button id="tr-mic-btn" class="tr-mic-btn" title="Iniciar traducción">
+          <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
+            <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
+            <line x1="12" y1="19" x2="12" y2="23"/>
+            <line x1="8" y1="23" x2="16" y2="23"/>
+          </svg>
+          <div class="tr-mic-rings">
+            <div class="tr-ring tr-ring-1"></div>
+            <div class="tr-ring tr-ring-2"></div>
+          </div>
+        </button>
+        <div id="tr-status" class="tr-status">Presiona el micrófono para comenzar</div>
+      </div>
+
+      <!-- Interim (lo que está escuchando ahora) -->
+      <div id="tr-interim-wrap" class="tr-interim-wrap hidden">
+        <span class="tr-interim-label">Escuchando...</span>
+        <span id="tr-interim" class="tr-interim"></span>
+      </div>
+
+      <!-- Log de traducciones -->
+      <div id="tr-log" class="tr-log"></div>
+
+      <div class="tr-footer">
+        <button class="btn-ghost" id="tr-clear-btn">Limpiar historial</button>
+      </div>
     </section>
 
   </main>
