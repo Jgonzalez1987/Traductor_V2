@@ -952,25 +952,47 @@ updateLevelUI();
   // ---- Leer traducción en voz alta ----
   function readTranslation(text, lang, btn) {
     synth.cancel();
-    const utt = new SpeechSynthesisUtterance(text);
-    utt.lang   = lang;
-    utt.rate   = 0.9;
-    utt.pitch  = 1;
-    utt.volume = 1;
 
-    // Elegir la mejor voz disponible para ese idioma
-    const voices = synth.getVoices();
-    const match  = voices.find(v => v.lang === lang)
-                || voices.find(v => v.lang.startsWith(lang.split("-")[0]))
-                || null;
-    if (match) utt.voice = match;
+    function speak(voices) {
+      const utt    = new SpeechSynthesisUtterance(text);
+      utt.lang     = lang;
+      utt.rate     = 0.9;
+      utt.pitch    = 1;
+      utt.volume   = 1;
 
-    if (btn) {
-      utt.onstart = () => btn.classList.add("speaking");
-      utt.onend   = () => btn.classList.remove("speaking");
-      utt.onerror = () => btn.classList.remove("speaking");
+      const base   = lang.split("-")[0].toLowerCase();
+
+      // Busca la mejor voz: exacta → mismo idioma base → cualquier cosa
+      const voice  = voices.find(v => v.lang.toLowerCase() === lang.toLowerCase())
+                  || voices.find(v => v.lang.toLowerCase().startsWith(base))
+                  || null;
+
+      if (voice) {
+        utt.voice = voice;
+      } else {
+        // Sin voz disponible → avisar al usuario
+        toast(`Sin voz disponible para este idioma en tu navegador`, "default");
+        return;
+      }
+
+      if (btn) {
+        utt.onstart = () => btn.classList.add("speaking");
+        utt.onend   = () => btn.classList.remove("speaking");
+        utt.onerror = () => btn.classList.remove("speaking");
+      }
+      synth.speak(utt);
     }
-    synth.speak(utt);
+
+    // Las voces pueden no estar listas aún — esperar si es necesario
+    const voices = synth.getVoices();
+    if (voices.length > 0) {
+      speak(voices);
+    } else {
+      synth.onvoiceschanged = () => {
+        synth.onvoiceschanged = null;
+        speak(synth.getVoices());
+      };
+    }
   }
 
   function escapeHtml(str) {
