@@ -714,14 +714,14 @@ updateLevelUI();
   let trBuffer        = [];
   let trDebounceTimer = null;
   let trTranslating   = false;
-  let trSeen          = new Set(); // evita duplicados en Android
+  let trProcessed     = ""; // texto ya procesado en esta sesión
   const DEBOUNCE_MS   = 2500;
   const RETRY_MS      = 15000;
 
   // Build recognition instance
   if (SpeechRecognition) {
     trRecognition = new SpeechRecognition();
-    trRecognition.continuous      = true;
+    trRecognition.continuous      = false; // más confiable en Android
     trRecognition.interimResults  = true;
 
     trRecognition.onresult = (e) => {
@@ -729,11 +729,18 @@ updateLevelUI();
       for (let i = e.resultIndex; i < e.results.length; i++) {
         const r = e.results[i];
         if (r.isFinal) {
-          const text = r[0].transcript.trim();
-          // Ignorar si ya lo procesamos (Android repite al reiniciarse)
-          if (text && !trSeen.has(text)) {
-            trSeen.add(text);
-            trBuffer.push(text);
+          const full = r[0].transcript.trim();
+
+          // Extraer solo la parte NUEVA (Android envía texto acumulativo)
+          let newText = full;
+          const already = trProcessed.trim().toLowerCase();
+          if (already && full.toLowerCase().startsWith(already)) {
+            newText = full.slice(trProcessed.trim().length).trim();
+          }
+
+          if (newText) {
+            trProcessed += (trProcessed ? " " : "") + newText;
+            trBuffer.push(newText);
             trInterimEl.textContent = "";
             clearTimeout(trDebounceTimer);
             trDebounceTimer = setTimeout(flushBuffer, DEBOUNCE_MS);
@@ -757,9 +764,12 @@ updateLevelUI();
       }
     };
 
+    // Reiniciar automáticamente con pequeño delay (evita bucle rápido en Android)
     trRecognition.onend = () => {
       if (trIsListening) {
-        try { trRecognition.start(); } catch (_) {}
+        setTimeout(() => {
+          try { trRecognition.start(); } catch (_) {}
+        }, 150);
       }
     };
   }
@@ -1082,8 +1092,8 @@ updateLevelUI();
     setStatus("🔴 Escuchando...", true);
     trInterimWrap.classList.add("hidden");
     trInterimEl.textContent = "";
-    trBuffer = [];
-    trSeen   = new Set();
+    trBuffer    = [];
+    trProcessed = "";
     clearTimeout(trDebounceTimer);
     try { trRecognition.start(); } catch (_) {}
   }
@@ -1105,8 +1115,8 @@ updateLevelUI();
 
   trClearBtn.addEventListener("click", () => {
     trLog.innerHTML = "";
-    trBuffer = [];
-    trSeen   = new Set();
+    trBuffer    = [];
+    trProcessed = "";
     clearTimeout(trDebounceTimer);
     trInterimEl.textContent = "";
     trInterimWrap.classList.add("hidden");
