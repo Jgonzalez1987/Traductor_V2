@@ -754,7 +754,7 @@ updateLevelUI();
       body: JSON.stringify({
         model: "claude-haiku-4-5-20251001",
         max_tokens: 400,
-        system: "Translate the following text to Spanish. Output only the Spanish translation, nothing else. Preserve the original meaning and tone.",
+        system: "You are a translation engine. Rules: 1) Output ONLY the Spanish translation. 2) No explanations, no notes, no alternatives, no punctuation added. 3) If the input is already Spanish, output it as-is. 4) Never greet, never comment, never add anything beyond the raw translation.",
         messages: [{ role: "user", content: text }]
       })
     });
