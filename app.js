@@ -699,6 +699,14 @@ updateLevelUI();
   const trDirFrom    = document.getElementById("tr-dir-from");
   const trDirLabel   = document.getElementById("tr-dir-label");
 
+  const LANG_NAMES = {
+    "en-US":"🇺🇸 Inglés","fr-FR":"🇫🇷 Francés","de-DE":"🇩🇪 Alemán",
+    "pt-BR":"🇧🇷 Portugués","it-IT":"🇮🇹 Italiano","zh-CN":"🇨🇳 Chino",
+    "ja-JP":"🇯🇵 Japonés","ko-KR":"🇰🇷 Coreano","ar-SA":"🇸🇦 Árabe",
+    "ru-RU":"🇷🇺 Ruso","hi-IN":"🇮🇳 Hindi","nl-NL":"🇳🇱 Holandés",
+    "th-TH":"🇹🇭 Tailandés","tr-TR":"🇹🇷 Turco"
+  };
+
   // Modo: 'to-es' = idioma→español | 'to-lang' = español→idioma
   let trMode          = "to-es";
   let trIsListening   = false;
@@ -872,14 +880,6 @@ updateLevelUI();
     const textEl = exchange.querySelector(".tr-bubble-es .tr-bubble-text");
     if (textEl) textEl.textContent = text;
   }
-
-  const LANG_NAMES = {
-    "en-US":"🇺🇸 Inglés","fr-FR":"🇫🇷 Francés","de-DE":"🇩🇪 Alemán",
-    "pt-BR":"🇧🇷 Portugués","it-IT":"🇮🇹 Italiano","zh-CN":"🇨🇳 Chino",
-    "ja-JP":"🇯🇵 Japonés","ko-KR":"🇰🇷 Coreano","ar-SA":"🇸🇦 Árabe",
-    "ru-RU":"🇷🇺 Ruso","hi-IN":"🇮🇳 Hindi","nl-NL":"🇳🇱 Holandés",
-    "th-TH":"🇹🇭 Tailandés","tr-TR":"🇹🇷 Turco"
-  };
 
   function addEntry(original) {
     const exchange = document.createElement("div");
