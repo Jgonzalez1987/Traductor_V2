@@ -932,30 +932,37 @@ updateLevelUI();
     speakerBtn.className = "tr-speak-btn";
     speakerBtn.title = "Escuchar traducción";
     speakerBtn.innerHTML = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/></svg>`;
-
-    speakerBtn.addEventListener("click", (e) => {
-      e.stopPropagation();
-      readTranslation(translation, ttsLang, speakerBtn);
-    });
-
     bubble.appendChild(speakerBtn);
 
-    // También al hacer clic en toda la burbuja
+    // Un solo handler en la burbuja — toggle: si ya habla lo detiene, si no habla lo reproduce
+    let isPlaying = false;
     bubble.style.cursor = "pointer";
     bubble.addEventListener("click", () => {
-      readTranslation(translation, ttsLang, speakerBtn);
+      if (isPlaying) {
+        synth.cancel();
+        isPlaying = false;
+        speakerBtn.classList.remove("speaking");
+        return;
+      }
+      isPlaying = true;
+      readTranslation(translation, ttsLang, speakerBtn, () => { isPlaying = false; });
     });
 
     trLog.parentElement.scrollTop = trLog.parentElement.scrollHeight;
   }
 
   // ---- Leer traducción en voz alta ----
-  function readTranslation(text, lang, btn) {
+  function readTranslation(text, lang, btn, onDone) {
     synth.cancel();
+
+    const done = () => {
+      if (btn) btn.classList.remove("speaking");
+      if (onDone) onDone();
+    };
 
     // Si ElevenLabs está activo → soporta todos los idiomas automáticamente
     if (elevenLabsEnabled) {
-      speakElevenLabsTr(text, btn);
+      speakElevenLabsTr(text, btn, done);
       return;
     }
 
@@ -973,21 +980,19 @@ updateLevelUI();
                  || null;
       if (voice) utt.voice = voice;
 
-      if (btn) {
-        utt.onstart = () => btn.classList.add("speaking");
-        utt.onend   = () => btn.classList.remove("speaking");
-        utt.onerror = (e) => {
-          btn.classList.remove("speaking");
-          if (e.error === "language-unavailable" || e.error === "voice-unavailable") {
-            showVoiceInstallGuide(lang);
-          }
-        };
-      }
+      if (btn) btn.classList.add("speaking");
+      utt.onend   = done;
+      utt.onerror = (e) => {
+        done();
+        if (e.error === "language-unavailable" || e.error === "voice-unavailable") {
+          showVoiceInstallGuide(lang);
+        }
+      };
       synth.speak(utt);
 
-      // Chrome a veces no dispara onerror — detectar silencio tras 800ms
+      // Detectar si no habló nada tras 800ms
       setTimeout(() => {
-        if (!synth.speaking && !synth.pending) showVoiceInstallGuide(lang);
+        if (!synth.speaking && !synth.pending) { done(); showVoiceInstallGuide(lang); }
       }, 800);
     }
 
@@ -1006,7 +1011,7 @@ updateLevelUI();
   }
 
   // ElevenLabs TTS para el traductor (multilingual)
-  async function speakElevenLabsTr(text, btn) {
+  async function speakElevenLabsTr(text, btn, onDone) {
     if (btn) btn.classList.add("speaking");
     try {
       const res = await fetch(`${API_BASE}/api/tts`, {
@@ -1015,14 +1020,14 @@ updateLevelUI();
         body: JSON.stringify({ text })
       });
       if (!res.ok) throw new Error("TTS error");
-      const blob = await res.blob();
-      const url  = URL.createObjectURL(blob);
+      const blob  = await res.blob();
+      const url   = URL.createObjectURL(blob);
       const audio = new Audio(url);
-      audio.onended = () => { if (btn) btn.classList.remove("speaking"); URL.revokeObjectURL(url); };
-      audio.onerror = () => { if (btn) btn.classList.remove("speaking"); };
+      audio.onended = () => { URL.revokeObjectURL(url); if (onDone) onDone(); };
+      audio.onerror = () => { if (onDone) onDone(); };
       await audio.play();
     } catch {
-      if (btn) btn.classList.remove("speaking");
+      if (onDone) onDone();
     }
   }
 
