@@ -917,12 +917,60 @@ updateLevelUI();
   }
 
   function finalizeEntry(exchange, translation) {
-    const textEl = exchange.querySelector(".tr-bubble-es .tr-bubble-text");
-    if (textEl) {
-      textEl.className = "tr-bubble-text";
-      textEl.textContent = translation;
-    }
+    const bubble = exchange.querySelector(".tr-bubble-es");
+    const textEl = bubble?.querySelector(".tr-bubble-text");
+    if (!textEl) return;
+
+    textEl.className = "tr-bubble-text";
+    textEl.textContent = translation;
+
+    // Determinar el idioma de salida para TTS
+    const ttsLang = trMode === "to-es" ? "es-ES" : trLangSelect.value;
+
+    // Ícono de altavoz
+    const speakerBtn = document.createElement("button");
+    speakerBtn.className = "tr-speak-btn";
+    speakerBtn.title = "Escuchar traducción";
+    speakerBtn.innerHTML = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/></svg>`;
+
+    speakerBtn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      readTranslation(translation, ttsLang, speakerBtn);
+    });
+
+    bubble.appendChild(speakerBtn);
+
+    // También al hacer clic en toda la burbuja
+    bubble.style.cursor = "pointer";
+    bubble.addEventListener("click", () => {
+      readTranslation(translation, ttsLang, speakerBtn);
+    });
+
     trLog.parentElement.scrollTop = trLog.parentElement.scrollHeight;
+  }
+
+  // ---- Leer traducción en voz alta ----
+  function readTranslation(text, lang, btn) {
+    synth.cancel();
+    const utt = new SpeechSynthesisUtterance(text);
+    utt.lang   = lang;
+    utt.rate   = 0.9;
+    utt.pitch  = 1;
+    utt.volume = 1;
+
+    // Elegir la mejor voz disponible para ese idioma
+    const voices = synth.getVoices();
+    const match  = voices.find(v => v.lang === lang)
+                || voices.find(v => v.lang.startsWith(lang.split("-")[0]))
+                || null;
+    if (match) utt.voice = match;
+
+    if (btn) {
+      utt.onstart = () => btn.classList.add("speaking");
+      utt.onend   = () => btn.classList.remove("speaking");
+      utt.onerror = () => btn.classList.remove("speaking");
+    }
+    synth.speak(utt);
   }
 
   function escapeHtml(str) {
