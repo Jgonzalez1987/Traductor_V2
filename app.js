@@ -954,44 +954,49 @@ updateLevelUI();
     synth.cancel();
 
     function speak(voices) {
-      const utt    = new SpeechSynthesisUtterance(text);
-      utt.lang     = lang;
-      utt.rate     = 0.9;
-      utt.pitch    = 1;
-      utt.volume   = 1;
+      const utt  = new SpeechSynthesisUtterance(text);
+      utt.lang   = lang;           // el navegador usará este idioma
+      utt.rate   = 0.9;
+      utt.pitch  = 1;
+      utt.volume = 1;
 
-      const base   = lang.split("-")[0].toLowerCase();
-
-      // Busca la mejor voz: exacta → mismo idioma base → cualquier cosa
-      const voice  = voices.find(v => v.lang.toLowerCase() === lang.toLowerCase())
-                  || voices.find(v => v.lang.toLowerCase().startsWith(base))
-                  || null;
-
-      if (voice) {
-        utt.voice = voice;
-      } else {
-        // Sin voz disponible → avisar al usuario
-        toast(`Sin voz disponible para este idioma en tu navegador`, "default");
-        return;
-      }
+      // Intentar encontrar la mejor voz, pero NO bloquear si no hay
+      const base  = lang.split("-")[0].toLowerCase();
+      const voice = voices.find(v => v.lang.toLowerCase() === lang.toLowerCase())
+                 || voices.find(v => v.lang.toLowerCase().startsWith(base))
+                 || null;
+      if (voice) utt.voice = voice;
+      // Sin voz exacta → el navegador igual intenta con utt.lang
 
       if (btn) {
         utt.onstart = () => btn.classList.add("speaking");
         utt.onend   = () => btn.classList.remove("speaking");
-        utt.onerror = () => btn.classList.remove("speaking");
+        utt.onerror = (e) => {
+          btn.classList.remove("speaking");
+          // Solo avisar si el error es específico del idioma
+          if (e.error === "language-unavailable" || e.error === "voice-unavailable") {
+            toast("Este idioma no tiene voz en tu navegador. Prueba en Edge.", "default");
+          }
+        };
       }
       synth.speak(utt);
     }
 
-    // Las voces pueden no estar listas aún — esperar si es necesario
     const voices = synth.getVoices();
     if (voices.length > 0) {
       speak(voices);
     } else {
+      // Voces aún no cargadas — escuchar el evento y también reintentar por si no dispara
+      let fired = false;
       synth.onvoiceschanged = () => {
+        if (fired) return;
+        fired = true;
         synth.onvoiceschanged = null;
         speak(synth.getVoices());
       };
+      setTimeout(() => {
+        if (!fired) { fired = true; speak(synth.getVoices()); }
+      }, 500);
     }
   }
 
