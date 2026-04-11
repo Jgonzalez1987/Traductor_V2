@@ -785,25 +785,48 @@ updateLevelUI();
     if (trQueue.length > 0) processQueue();
   }
 
+  const LANG_NAMES = {
+    "en-US":"🇺🇸 Inglés","fr-FR":"🇫🇷 Francés","de-DE":"🇩🇪 Alemán",
+    "pt-BR":"🇧🇷 Portugués","it-IT":"🇮🇹 Italiano","zh-CN":"🇨🇳 Chino",
+    "ja-JP":"🇯🇵 Japonés","ko-KR":"🇰🇷 Coreano","ar-SA":"🇸🇦 Árabe",
+    "ru-RU":"🇷🇺 Ruso","hi-IN":"🇮🇳 Hindi","nl-NL":"🇳🇱 Holandés",
+    "th-TH":"🇹🇭 Tailandés","tr-TR":"🇹🇷 Turco"
+  };
+
   function addEntry(original) {
-    const div = document.createElement("div");
-    div.className = "tr-entry pending";
-    div.innerHTML = `
-      <div class="tr-original">${escapeHtml(original)}</div>
-      <div class="tr-arrow">→</div>
-      <div class="tr-translation translating">traduciendo...</div>
+    const exchange = document.createElement("div");
+    exchange.className = "tr-exchange";
+
+    // Burbuja izquierda — texto original
+    const origBubble = document.createElement("div");
+    origBubble.className = "tr-bubble tr-bubble-orig";
+    origBubble.innerHTML = `
+      <div class="tr-bubble-label">${LANG_NAMES[trLangSelect.value] || trLangSelect.value}</div>
+      <div class="tr-bubble-text">${escapeHtml(original)}</div>
     `;
-    trLog.insertBefore(div, trLog.firstChild);
-    return div;
+
+    // Burbuja derecha — traducción (dots mientras espera)
+    const esBubble = document.createElement("div");
+    esBubble.className = "tr-bubble tr-bubble-es";
+    esBubble.innerHTML = `
+      <div class="tr-bubble-label">🇪🇸 Español</div>
+      <div class="tr-bubble-text tr-dots"><span></span><span></span><span></span></div>
+    `;
+
+    exchange.appendChild(origBubble);
+    exchange.appendChild(esBubble);
+    trLog.appendChild(exchange);
+    trLog.parentElement.scrollTop = trLog.parentElement.scrollHeight;
+    return exchange;
   }
 
-  function finalizeEntry(entry, translation) {
-    entry.classList.remove("pending");
-    const el = entry.querySelector(".tr-translation");
-    if (el) {
-      el.textContent = translation;
-      el.classList.remove("translating");
+  function finalizeEntry(exchange, translation) {
+    const textEl = exchange.querySelector(".tr-bubble-es .tr-bubble-text");
+    if (textEl) {
+      textEl.className = "tr-bubble-text";
+      textEl.textContent = translation;
     }
+    trLog.parentElement.scrollTop = trLog.parentElement.scrollHeight;
   }
 
   function escapeHtml(str) {
@@ -819,7 +842,7 @@ updateLevelUI();
     trRecognition.lang = trLangSelect.value;
     trIsListening = true;
     trMicBtn.classList.add("listening");
-    trStatus.textContent = "Escuchando — habla ahora";
+    trStatus.textContent = "🔴 Escuchando...";
     trStatus.classList.add("active");
     trInterimWrap.classList.add("hidden");
     trInterimEl.textContent = "";
@@ -829,7 +852,7 @@ updateLevelUI();
   function stopTr() {
     trIsListening = false;
     trMicBtn.classList.remove("listening");
-    trStatus.textContent = "Presiona el micrófono para comenzar";
+    trStatus.textContent = "Selecciona idioma y presiona el micrófono";
     trStatus.classList.remove("active");
     trInterimWrap.classList.add("hidden");
     trInterimEl.textContent = "";
