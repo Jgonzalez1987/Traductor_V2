@@ -175,6 +175,19 @@
           </select>
         </div>
 
+        <!-- Barra de dirección -->
+        <div class="tr-dir-bar">
+          <button id="tr-dir-btn" class="tr-dir-btn active" data-mode="to-es">
+            <span class="tr-dir-flag" id="tr-dir-from">🌍</span>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+            <span class="tr-dir-flag">🇪🇸</span>
+            <span class="tr-dir-label" id="tr-dir-label">Traducir al Español</span>
+          </button>
+          <button id="tr-swap-btn" class="tr-swap-btn" title="Cambiar dirección">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M7 16V4m0 0L3 8m4-4l4 4"/><path d="M17 8v12m0 0l4-4m-4 4l-4-4"/></svg>
+          </button>
+        </div>
+
         <!-- Cuerpo del chat -->
         <div class="tr-body" id="tr-body">
           <div class="tr-messages" id="tr-log"></div>

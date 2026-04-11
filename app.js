@@ -694,14 +694,20 @@ updateLevelUI();
   const trLog        = document.getElementById("tr-log");
   const trLangSelect = document.getElementById("tr-lang-select");
   const trClearBtn   = document.getElementById("tr-clear-btn");
+  const trSwapBtn    = document.getElementById("tr-swap-btn");
+  const trDirBtn     = document.getElementById("tr-dir-btn");
+  const trDirFrom    = document.getElementById("tr-dir-from");
+  const trDirLabel   = document.getElementById("tr-dir-label");
 
+  // Modo: 'to-es' = idioma→español | 'to-lang' = español→idioma
+  let trMode          = "to-es";
   let trIsListening   = false;
   let trRecognition   = null;
-  let trBuffer        = [];      // acumula segmentos finales antes de traducir
-  let trDebounceTimer = null;    // espera pausa en el habla
+  let trBuffer        = [];
+  let trDebounceTimer = null;
   let trTranslating   = false;
-  const DEBOUNCE_MS   = 2500;   // espera 2.5s de silencio antes de traducir
-  const RETRY_MS      = 15000;  // espera 15s antes de reintentar si hay rate limit
+  const DEBOUNCE_MS   = 2500;
+  const RETRY_MS      = 15000;
 
   // Build recognition instance
   if (SpeechRecognition) {
@@ -748,6 +754,41 @@ updateLevelUI();
     };
   }
 
+  // ---- Actualizar UI de dirección ----
+  function updateDirUI() {
+    const langName = LANG_NAMES[trLangSelect.value] || trLangSelect.value;
+    if (trMode === "to-es") {
+      trDirFrom.textContent = langName.split(" ")[0]; // solo el emoji
+      trDirLabel.textContent = "Traducir al Español";
+    } else {
+      trDirFrom.textContent = "🇪🇸";
+      trDirLabel.textContent = `Traducir al ${langName.split(" ").slice(1).join(" ")}`;
+    }
+  }
+
+  trSwapBtn.addEventListener("click", () => {
+    trMode = trMode === "to-es" ? "to-lang" : "to-es";
+    updateDirUI();
+    if (trIsListening) {
+      // Reiniciar reconocimiento con nuevo idioma fuente
+      try { trRecognition.stop(); } catch (_) {}
+      trBuffer = [];
+      clearTimeout(trDebounceTimer);
+    }
+  });
+
+  trLangSelect.addEventListener("change", () => {
+    updateDirUI();
+    if (trIsListening) {
+      try { trRecognition.stop(); } catch (_) {}
+      trBuffer = [];
+      clearTimeout(trDebounceTimer);
+    }
+  });
+
+  // Inicializar UI
+  updateDirUI();
+
   // Junta todo el buffer y lanza UNA sola traducción
   function flushBuffer() {
     if (trBuffer.length === 0) return;
@@ -760,13 +801,17 @@ updateLevelUI();
 
   // ---- Traducción via Claude proxy con reintento automático ----
   async function translateText(text, attempt = 1) {
+    const targetLang = trMode === "to-es"
+      ? "Spanish"
+      : (LANG_NAMES[trLangSelect.value] || trLangSelect.value).split(" ").slice(1).join(" ");
+
     const res = await fetch(`${API_BASE}/api/chat`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         model: "claude-haiku-4-5-20251001",
         max_tokens: 300,
-        system: "You are a translation engine. Rules: 1) Output ONLY the Spanish translation. 2) No explanations, no notes, no alternatives. 3) If the input is already Spanish, output it as-is. 4) Never greet or comment.",
+        system: `You are a translation engine. Translate the input to ${targetLang}. Rules: 1) Output ONLY the translation. 2) No explanations, no notes, no alternatives. 3) Never greet or comment.`,
         messages: [{ role: "user", content: text }]
       })
     });
@@ -840,11 +885,19 @@ updateLevelUI();
     const exchange = document.createElement("div");
     exchange.className = "tr-exchange";
 
+    const fromLabel = trMode === "to-es"
+      ? (LANG_NAMES[trLangSelect.value] || trLangSelect.value)
+      : "🇪🇸 Español";
+
+    const toLabel = trMode === "to-es"
+      ? "🇪🇸 Español"
+      : (LANG_NAMES[trLangSelect.value] || trLangSelect.value);
+
     // Burbuja izquierda — texto original
     const origBubble = document.createElement("div");
     origBubble.className = "tr-bubble tr-bubble-orig";
     origBubble.innerHTML = `
-      <div class="tr-bubble-label">${LANG_NAMES[trLangSelect.value] || trLangSelect.value}</div>
+      <div class="tr-bubble-label">${fromLabel}</div>
       <div class="tr-bubble-text">${escapeHtml(original)}</div>
     `;
 
@@ -852,7 +905,7 @@ updateLevelUI();
     const esBubble = document.createElement("div");
     esBubble.className = "tr-bubble tr-bubble-es";
     esBubble.innerHTML = `
-      <div class="tr-bubble-label">🇪🇸 Español</div>
+      <div class="tr-bubble-label">${toLabel}</div>
       <div class="tr-bubble-text tr-dots"><span></span><span></span><span></span></div>
     `;
 
@@ -882,7 +935,8 @@ updateLevelUI();
       toast("Tu navegador no soporta reconocimiento de voz. Usa Chrome o Edge.", "default");
       return;
     }
-    trRecognition.lang = trLangSelect.value;
+    // Modo to-es: escucha el idioma seleccionado | to-lang: escucha español
+    trRecognition.lang = trMode === "to-es" ? trLangSelect.value : "es-ES";
     trIsListening = true;
     trMicBtn.classList.add("listening");
     setStatus("🔴 Escuchando...", true);
@@ -906,15 +960,6 @@ updateLevelUI();
 
   trMicBtn.addEventListener("click", () => {
     trIsListening ? stopTr() : startTr();
-  });
-
-  // Cambiar idioma mientras escucha → reiniciar reconocimiento
-  trLangSelect.addEventListener("change", () => {
-    if (trIsListening) {
-      try { trRecognition.stop(); } catch (_) {}
-      trRecognition.lang = trLangSelect.value;
-      setTimeout(() => { try { trRecognition.start(); } catch (_) {} }, 200);
-    }
   });
 
   trClearBtn.addEventListener("click", () => {
