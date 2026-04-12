@@ -1874,3 +1874,53 @@ body:has(#tab-chat.tab.active) .wa-chat-wrap {
 }
 
 .tr-voice-guide-close:hover { color: var(--text); }
+
+/* --- Botón cámara --- */
+.tr-cam-btn {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: var(--glass);
+  border: 1px solid var(--border);
+  color: var(--cyan);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+  flex-shrink: 0;
+}
+
+.tr-cam-btn:hover {
+  background: rgba(34,211,238,0.12);
+  border-color: var(--cyan);
+  transform: scale(1.07);
+}
+
+.tr-cam-btn:active { transform: scale(0.95); }
+
+.tr-cam-btn.loading {
+  animation: trCamSpin 1s linear infinite;
+  border-color: var(--cyan);
+  color: var(--cyan);
+}
+
+@keyframes trCamSpin {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+
+/* Burbuja de imagen */
+.tr-img-preview {
+  max-width: 180px;
+  max-height: 140px;
+  border-radius: 10px;
+  object-fit: cover;
+  display: block;
+  margin-bottom: 6px;
+  opacity: 0.85;
+}
+
+.tr-bubble-orig.img-bubble {
+  max-width: 60%;
+}

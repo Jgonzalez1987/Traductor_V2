@@ -1128,4 +1128,135 @@ updateLevelUI();
       if (btn.dataset.tab !== "traductor" && trIsListening) stopTr();
     });
   });
+
+  // ============================================================
+  //  TRADUCCIÓN DE IMÁGENES — Claude Vision
+  // ============================================================
+  const trCamBtn   = document.getElementById("tr-cam-btn");
+  const trImgInput = document.getElementById("tr-img-input");
+
+  trCamBtn.addEventListener("click", () => trImgInput.click());
+
+  trImgInput.addEventListener("change", async () => {
+    const file = trImgInput.files[0];
+    if (!file) return;
+    trImgInput.value = ""; // reset para permitir la misma foto de nuevo
+
+    trCamBtn.classList.add("loading");
+    setStatus("📷 Analizando imagen...", true);
+
+    try {
+      const { base64, mime } = await resizeAndEncode(file, 1024);
+      await translateImage(base64, mime, file);
+    } catch (err) {
+      toast(`Error al procesar imagen: ${err.message}`, "error");
+    } finally {
+      trCamBtn.classList.remove("loading");
+      setStatus(trIsListening ? "🔴 Escuchando..." : "Selecciona idioma y presiona el micrófono",
+                trIsListening);
+    }
+  });
+
+  // Redimensionar imagen a max px y devolver base64
+  function resizeAndEncode(file, maxPx) {
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+      const url = URL.createObjectURL(file);
+      img.onload = () => {
+        URL.revokeObjectURL(url);
+        let { width, height } = img;
+        if (width > maxPx || height > maxPx) {
+          if (width > height) { height = Math.round(height * maxPx / width); width = maxPx; }
+          else                { width  = Math.round(width  * maxPx / height); height = maxPx; }
+        }
+        const canvas = document.createElement("canvas");
+        canvas.width  = width;
+        canvas.height = height;
+        canvas.getContext("2d").drawImage(img, 0, 0, width, height);
+        const mime   = "image/jpeg";
+        const base64 = canvas.toDataURL(mime, 0.85).split(",")[1];
+        resolve({ base64, mime });
+      };
+      img.onerror = () => reject(new Error("No se pudo cargar la imagen"));
+      img.src = url;
+    });
+  }
+
+  async function translateImage(base64, mime, file) {
+    // Mostrar burbuja con miniatura + puntos de espera
+    const exchange = document.createElement("div");
+    exchange.className = "tr-exchange";
+
+    const origBubble = document.createElement("div");
+    origBubble.className = "tr-bubble tr-bubble-orig img-bubble";
+    const thumb = document.createElement("img");
+    thumb.className = "tr-img-preview";
+    thumb.src = URL.createObjectURL(file);
+    origBubble.appendChild(thumb);
+    const origLabel = document.createElement("div");
+    origLabel.className = "tr-bubble-label";
+    origLabel.textContent = "📷 Imagen";
+    origBubble.prepend(origLabel);
+
+    const esBubble = document.createElement("div");
+    esBubble.className = "tr-bubble tr-bubble-es";
+    esBubble.innerHTML = `<div class="tr-bubble-label">🇪🇸 Español</div>
+      <div class="tr-bubble-text tr-dots"><span></span><span></span><span></span></div>`;
+
+    exchange.appendChild(origBubble);
+    exchange.appendChild(esBubble);
+    trLog.appendChild(exchange);
+    trLog.parentElement.scrollTop = trLog.parentElement.scrollHeight;
+
+    // Llamar a Claude Vision
+    try {
+      const res = await fetch(`${API_BASE}/api/chat`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          model: "claude-haiku-4-5-20251001",
+          max_tokens: 1000,
+          system: "You are a translator. The user sends an image (e.g. a restaurant menu, sign, or document). Extract ALL visible text from the image and translate it to Spanish. Output format:\n- If it's a menu or list, show each item as: [original] → [traducción]\n- If it's a sentence or paragraph, translate directly.\n- Output ONLY the translation content. No explanations, no greetings.",
+          messages: [{
+            role: "user",
+            content: [
+              { type: "image", source: { type: "base64", media_type: mime, data: base64 } },
+              { type: "text",  text: "Extrae y traduce todo el texto de esta imagen al español." }
+            ]
+          }]
+        })
+      });
+
+      const data = await res.json();
+      if (!res.ok) throw new Error(data?.error?.message || `HTTP ${res.status}`);
+
+      const translation = data.content?.[0]?.text?.trim() || "No se encontró texto en la imagen";
+      const textEl = esBubble.querySelector(".tr-bubble-text");
+      if (textEl) {
+        textEl.className = "tr-bubble-text";
+        textEl.style.whiteSpace = "pre-line";
+        textEl.textContent = translation;
+      }
+
+      // Botón de voz para la traducción de imagen
+      let isPlaying = false;
+      esBubble.style.cursor = "pointer";
+      const speakerBtn = document.createElement("button");
+      speakerBtn.className = "tr-speak-btn";
+      speakerBtn.title = "Escuchar traducción";
+      speakerBtn.innerHTML = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/></svg>`;
+      esBubble.appendChild(speakerBtn);
+      esBubble.addEventListener("click", () => {
+        if (isPlaying) { synth.cancel(); isPlaying = false; speakerBtn.classList.remove("speaking"); return; }
+        isPlaying = true;
+        readTranslation(translation, "es-ES", speakerBtn, () => { isPlaying = false; });
+      });
+
+    } catch (err) {
+      const textEl = esBubble.querySelector(".tr-bubble-text");
+      if (textEl) { textEl.className = "tr-bubble-text"; textEl.textContent = `⚠️ ${err.message}`; }
+    }
+
+    trLog.parentElement.scrollTop = trLog.parentElement.scrollHeight;
+  }
 })();
