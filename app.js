@@ -1262,22 +1262,23 @@ updateLevelUI();
   }
 
   // ============================================================
-  //  CÁMARA EN VIVO — traducción continua de texto en pantalla
+  //  CÁMARA EN VIVO — AR: congela frame, escanea, muestra traducción encima
   // ============================================================
   const trLiveBtn       = document.getElementById("tr-live-btn");
   const trLiveOverlay   = document.getElementById("tr-live-overlay");
   const trLiveVideo     = document.getElementById("tr-live-video");
+  const trLiveCanvas    = document.getElementById("tr-live-canvas");
+  const trLiveScan      = document.getElementById("tr-live-scan");
+  const trLiveArBubble  = document.getElementById("tr-live-ar-bubble");
   const trLiveText      = document.getElementById("tr-live-text");
   const trLiveClose     = document.getElementById("tr-live-close");
-  const trLiveStatus    = document.getElementById("tr-live-status");
   const trLiveCountdown = document.getElementById("tr-live-countdown");
 
-  let liveStream        = null;
-  let liveInterval      = null;
-  let liveCountTimer    = null;
-  let liveNextIn        = 0;
-  let liveActive        = false;
-  const LIVE_INTERVAL_MS = 12000; // 5 req/min → 1 cada 12s con margen
+  let liveStream     = null;
+  let liveCountTimer = null;
+  let liveNextIn     = 0;
+  let liveActive     = false;
+  const LIVE_INTERVAL_MS = 12000;
 
   async function startLive() {
     if (liveActive) return;
@@ -1306,91 +1307,108 @@ updateLevelUI();
     trLiveVideo.srcObject = liveStream;
     trLiveOverlay.classList.remove("hidden");
     trLiveOverlay.setAttribute("aria-hidden", "false");
-    trLiveText.textContent = "Apuntando la cámara al texto…";
-    trLiveText.classList.add("loading");
 
-    // Primera captura inmediata, luego cada LIVE_INTERVAL_MS
-    captureAndTranslate();
-    scheduleNextCapture();
+    // Primera captura inmediata después de que el video esté listo
+    trLiveVideo.onloadedmetadata = () => {
+      captureAndTranslate();
+    };
+    // Fallback si el video ya estaba listo
+    if (trLiveVideo.readyState >= 2) captureAndTranslate();
   }
 
   function stopLive() {
     if (!liveActive) return;
     liveActive = false;
-    clearInterval(liveInterval);
     clearTimeout(liveCountTimer);
-    liveInterval = null;
 
     if (liveStream) {
       liveStream.getTracks().forEach(t => t.stop());
       liveStream = null;
     }
     trLiveVideo.srcObject = null;
+    trLiveVideo.onloadedmetadata = null;
     trLiveOverlay.classList.add("hidden");
     trLiveOverlay.setAttribute("aria-hidden", "true");
+    trLiveCanvas.classList.add("hidden");
+    trLiveScan.classList.add("hidden");
+    trLiveArBubble.classList.add("hidden");
     trLiveCountdown.classList.add("hidden");
     trLiveBtn.classList.remove("active");
   }
 
-  function scheduleNextCapture() {
-    clearInterval(liveInterval);
-    clearTimeout(liveCountTimer);
-    liveNextIn = Math.round(LIVE_INTERVAL_MS / 1000);
+  function showLiveVideo() {
+    trLiveCanvas.classList.add("hidden");
+    trLiveScan.classList.add("hidden");
+    trLiveArBubble.classList.add("hidden");
+  }
 
+  function freezeFrameToCanvas() {
+    const w = trLiveVideo.videoWidth  || 640;
+    const h = trLiveVideo.videoHeight || 480;
+    trLiveCanvas.width  = w;
+    trLiveCanvas.height = h;
+    trLiveCanvas.getContext("2d").drawImage(trLiveVideo, 0, 0, w, h);
+    trLiveCanvas.classList.remove("hidden");
+
+    // Redimensionar a max 1024px para la API
+    const maxPx = 1024;
+    let rw = w, rh = h;
+    if (w > maxPx || h > maxPx) {
+      if (w > h) { rh = Math.round(h * maxPx / w); rw = maxPx; }
+      else       { rw = Math.round(w * maxPx / h); rh = maxPx; }
+    }
+    const tmp = document.createElement("canvas");
+    tmp.width = rw; tmp.height = rh;
+    tmp.getContext("2d").drawImage(trLiveCanvas, 0, 0, rw, rh);
+    return tmp.toDataURL("image/jpeg", 0.82).split(",")[1];
+  }
+
+  function startCountdown(onDone) {
+    liveNextIn = Math.round(LIVE_INTERVAL_MS / 1000);
     function tick() {
       if (!liveActive) return;
       if (liveNextIn > 0) {
         trLiveCountdown.classList.remove("hidden");
-        trLiveCountdown.textContent = `Siguiente en ${liveNextIn}s`;
+        trLiveCountdown.textContent = `📷 ${liveNextIn}s`;
         liveNextIn--;
         liveCountTimer = setTimeout(tick, 1000);
       } else {
         trLiveCountdown.classList.add("hidden");
-        captureAndTranslate();
-        liveNextIn = Math.round(LIVE_INTERVAL_MS / 1000);
-        liveCountTimer = setTimeout(tick, 1000);
+        onDone();
       }
     }
     liveCountTimer = setTimeout(tick, 1000);
   }
 
-  function captureFrame() {
-    const canvas = document.createElement("canvas");
-    canvas.width  = trLiveVideo.videoWidth  || 640;
-    canvas.height = trLiveVideo.videoHeight || 480;
-    canvas.getContext("2d").drawImage(trLiveVideo, 0, 0, canvas.width, canvas.height);
-    const base64 = canvas.toDataURL("image/jpeg", 0.8).split(",")[1];
-    return base64;
-  }
-
   async function captureAndTranslate() {
     if (!liveActive) return;
 
-    // Si el video aún no tiene dimensiones, esperar un momento
+    // Esperar dimensiones si es la primera vez
     if (!trLiveVideo.videoWidth) {
-      await new Promise(r => setTimeout(r, 500));
+      await new Promise(r => setTimeout(r, 600));
       if (!liveActive) return;
     }
 
-    trLiveText.classList.add("loading");
-    const dotText = trLiveText.textContent;
-    trLiveText.textContent = "Escaneando…";
+    // 1) Congelar el frame visible
+    const base64 = freezeFrameToCanvas();
+
+    // 2) Mostrar animación de escaneo sobre el frame congelado
+    trLiveScan.classList.remove("hidden");
+    trLiveArBubble.classList.add("hidden");
 
     try {
-      const base64 = captureFrame();
-
       const res = await fetch(`${API_BASE}/api/chat`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           model: "claude-haiku-4-5-20251001",
-          max_tokens: 600,
-          system: "You are a live translation engine. The user sends a camera frame. Extract ALL visible text from the image and translate it to Spanish. Rules:\n- Output ONLY the Spanish translation. No explanations, no greetings.\n- If text is a menu or list, show each item on its own line.\n- If no text is visible, reply exactly: (Sin texto visible)\n- Keep it concise.",
+          max_tokens: 400,
+          system: "You are a translation engine for a live camera AR app. Extract ALL visible text from the image and translate it to Spanish. Output ONLY the translation. No explanations, no labels, no greetings. If no text is visible, reply: (Sin texto visible)",
           messages: [{
             role: "user",
             content: [
               { type: "image", source: { type: "base64", media_type: "image/jpeg", data: base64 } },
-              { type: "text",  text: "Traduce todo el texto visible al español." }
+              { type: "text",  text: "Traduce." }
             ]
           }]
         })
@@ -1401,22 +1419,36 @@ updateLevelUI();
       const data = await res.json();
 
       if (res.status === 429) {
-        trLiveText.textContent = dotText || "⏳ Límite de velocidad — reintentando en el siguiente ciclo";
-        trLiveText.classList.remove("loading");
+        // Rate limit: volver al video en vivo y reintentar en el siguiente ciclo
+        showLiveVideo();
+        startCountdown(() => captureAndTranslate());
         return;
       }
 
       if (!res.ok) throw new Error(data?.error?.message || `HTTP ${res.status}`);
 
       const translation = data.content?.[0]?.text?.trim() || "(Sin texto visible)";
+
+      // 3) Ocultar scan, mostrar burbuja AR sobre el frame congelado
+      trLiveScan.classList.add("hidden");
       trLiveText.textContent = translation;
-      trLiveText.classList.remove("loading");
+      trLiveArBubble.classList.remove("hidden");
+
+      // 4) Tras 5 segundos, volver al video en vivo y programar siguiente captura
+      await new Promise(r => setTimeout(r, 5000));
+      if (!liveActive) return;
+      showLiveVideo();
+      startCountdown(() => captureAndTranslate());
 
     } catch (err) {
-      if (liveActive) {
-        trLiveText.textContent = `⚠️ ${err.message}`;
-        trLiveText.classList.remove("loading");
-      }
+      if (!liveActive) return;
+      trLiveScan.classList.add("hidden");
+      trLiveText.textContent = `⚠️ ${err.message}`;
+      trLiveArBubble.classList.remove("hidden");
+      await new Promise(r => setTimeout(r, 4000));
+      if (!liveActive) return;
+      showLiveVideo();
+      startCountdown(() => captureAndTranslate());
     }
   }
 
