@@ -1445,7 +1445,7 @@ updateLevelUI();
         body: JSON.stringify({
           model: "claude-haiku-4-5-20251001",
           max_tokens: 200,
-          system: "Translate any text in the image to Spanish. RULES: 1) Output ONLY the Spanish translation — nothing else. 2) Never output text in any other language. 3) If no text is visible, output exactly: (Sin texto)",
+          system: "You are a camera translator. Look at the image and find text that is NOT in Spanish. Translate that non-Spanish text to Spanish. RULES: 1) IGNORE any text already written in Spanish — do not repeat it. 2) Find text in other languages (English, Thai, Chinese, Japanese, etc.) and translate ONLY those to Spanish. 3) Output ONLY the Spanish translation. 4) If all visible text is already in Spanish or there is no text, output exactly: (Sin texto extranjero)",
           messages: [{
             role: "user",
             content: [
