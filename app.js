@@ -1304,16 +1304,31 @@ updateLevelUI();
 
     liveActive = true;
     trLiveBtn.classList.add("active");
+
+    // Android requiere estas propiedades explícitas para mostrar el video
+    trLiveVideo.setAttribute("autoplay", "");
+    trLiveVideo.setAttribute("playsinline", "");
+    trLiveVideo.setAttribute("muted", "");
+    trLiveVideo.muted = true;
+    trLiveVideo.playsInline = true;
     trLiveVideo.srcObject = liveStream;
+
     trLiveOverlay.classList.remove("hidden");
     trLiveOverlay.setAttribute("aria-hidden", "false");
 
-    // Primera captura inmediata después de que el video esté listo
-    trLiveVideo.onloadedmetadata = () => {
+    // Forzar play() explícito — necesario en Android Chrome
+    try { await trLiveVideo.play(); } catch (_) {}
+
+    // Primera captura cuando el video tenga dimensiones reales
+    trLiveVideo.onloadedmetadata = async () => {
+      await new Promise(r => setTimeout(r, 300)); // pequeño delay para que el frame sea visible
       captureAndTranslate();
     };
     // Fallback si el video ya estaba listo
-    if (trLiveVideo.readyState >= 2) captureAndTranslate();
+    if (trLiveVideo.readyState >= 2) {
+      await new Promise(r => setTimeout(r, 300));
+      captureAndTranslate();
+    }
   }
 
   function stopLive() {
@@ -1325,6 +1340,7 @@ updateLevelUI();
       liveStream.getTracks().forEach(t => t.stop());
       liveStream = null;
     }
+    trLiveVideo.pause();
     trLiveVideo.srcObject = null;
     trLiveVideo.onloadedmetadata = null;
     trLiveOverlay.classList.add("hidden");
