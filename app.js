@@ -1126,6 +1126,7 @@ updateLevelUI();
   document.querySelectorAll(".nav-btn").forEach(btn => {
     btn.addEventListener("click", () => {
       if (btn.dataset.tab !== "traductor" && trIsListening) stopTr();
+      if (btn.dataset.tab !== "traductor") stopLive();
     });
   });
 
@@ -1259,4 +1260,175 @@ updateLevelUI();
 
     trLog.parentElement.scrollTop = trLog.parentElement.scrollHeight;
   }
+
+  // ============================================================
+  //  CÁMARA EN VIVO — traducción continua de texto en pantalla
+  // ============================================================
+  const trLiveBtn       = document.getElementById("tr-live-btn");
+  const trLiveOverlay   = document.getElementById("tr-live-overlay");
+  const trLiveVideo     = document.getElementById("tr-live-video");
+  const trLiveText      = document.getElementById("tr-live-text");
+  const trLiveClose     = document.getElementById("tr-live-close");
+  const trLiveStatus    = document.getElementById("tr-live-status");
+  const trLiveCountdown = document.getElementById("tr-live-countdown");
+
+  let liveStream        = null;
+  let liveInterval      = null;
+  let liveCountTimer    = null;
+  let liveNextIn        = 0;
+  let liveActive        = false;
+  const LIVE_INTERVAL_MS = 12000; // 5 req/min → 1 cada 12s con margen
+
+  async function startLive() {
+    if (liveActive) return;
+
+    if (!navigator.mediaDevices?.getUserMedia) {
+      toast("Tu navegador no soporta acceso a la cámara", "error");
+      return;
+    }
+
+    try {
+      liveStream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: { ideal: "environment" }, width: { ideal: 1280 }, height: { ideal: 720 } },
+        audio: false
+      });
+    } catch (err) {
+      if (err.name === "NotAllowedError" || err.name === "PermissionDeniedError") {
+        toast("Permite el acceso a la cámara en tu navegador", "error");
+      } else {
+        toast("No se pudo acceder a la cámara: " + err.message, "error");
+      }
+      return;
+    }
+
+    liveActive = true;
+    trLiveBtn.classList.add("active");
+    trLiveVideo.srcObject = liveStream;
+    trLiveOverlay.classList.remove("hidden");
+    trLiveOverlay.setAttribute("aria-hidden", "false");
+    trLiveText.textContent = "Apuntando la cámara al texto…";
+    trLiveText.classList.add("loading");
+
+    // Primera captura inmediata, luego cada LIVE_INTERVAL_MS
+    captureAndTranslate();
+    scheduleNextCapture();
+  }
+
+  function stopLive() {
+    if (!liveActive) return;
+    liveActive = false;
+    clearInterval(liveInterval);
+    clearTimeout(liveCountTimer);
+    liveInterval = null;
+
+    if (liveStream) {
+      liveStream.getTracks().forEach(t => t.stop());
+      liveStream = null;
+    }
+    trLiveVideo.srcObject = null;
+    trLiveOverlay.classList.add("hidden");
+    trLiveOverlay.setAttribute("aria-hidden", "true");
+    trLiveCountdown.classList.add("hidden");
+    trLiveBtn.classList.remove("active");
+  }
+
+  function scheduleNextCapture() {
+    clearInterval(liveInterval);
+    clearTimeout(liveCountTimer);
+    liveNextIn = Math.round(LIVE_INTERVAL_MS / 1000);
+
+    function tick() {
+      if (!liveActive) return;
+      if (liveNextIn > 0) {
+        trLiveCountdown.classList.remove("hidden");
+        trLiveCountdown.textContent = `Siguiente en ${liveNextIn}s`;
+        liveNextIn--;
+        liveCountTimer = setTimeout(tick, 1000);
+      } else {
+        trLiveCountdown.classList.add("hidden");
+        captureAndTranslate();
+        liveNextIn = Math.round(LIVE_INTERVAL_MS / 1000);
+        liveCountTimer = setTimeout(tick, 1000);
+      }
+    }
+    liveCountTimer = setTimeout(tick, 1000);
+  }
+
+  function captureFrame() {
+    const canvas = document.createElement("canvas");
+    canvas.width  = trLiveVideo.videoWidth  || 640;
+    canvas.height = trLiveVideo.videoHeight || 480;
+    canvas.getContext("2d").drawImage(trLiveVideo, 0, 0, canvas.width, canvas.height);
+    const base64 = canvas.toDataURL("image/jpeg", 0.8).split(",")[1];
+    return base64;
+  }
+
+  async function captureAndTranslate() {
+    if (!liveActive) return;
+
+    // Si el video aún no tiene dimensiones, esperar un momento
+    if (!trLiveVideo.videoWidth) {
+      await new Promise(r => setTimeout(r, 500));
+      if (!liveActive) return;
+    }
+
+    trLiveText.classList.add("loading");
+    const dotText = trLiveText.textContent;
+    trLiveText.textContent = "Escaneando…";
+
+    try {
+      const base64 = captureFrame();
+
+      const res = await fetch(`${API_BASE}/api/chat`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          model: "claude-haiku-4-5-20251001",
+          max_tokens: 600,
+          system: "You are a live translation engine. The user sends a camera frame. Extract ALL visible text from the image and translate it to Spanish. Rules:\n- Output ONLY the Spanish translation. No explanations, no greetings.\n- If text is a menu or list, show each item on its own line.\n- If no text is visible, reply exactly: (Sin texto visible)\n- Keep it concise.",
+          messages: [{
+            role: "user",
+            content: [
+              { type: "image", source: { type: "base64", media_type: "image/jpeg", data: base64 } },
+              { type: "text",  text: "Traduce todo el texto visible al español." }
+            ]
+          }]
+        })
+      });
+
+      if (!liveActive) return;
+
+      const data = await res.json();
+
+      if (res.status === 429) {
+        trLiveText.textContent = dotText || "⏳ Límite de velocidad — reintentando en el siguiente ciclo";
+        trLiveText.classList.remove("loading");
+        return;
+      }
+
+      if (!res.ok) throw new Error(data?.error?.message || `HTTP ${res.status}`);
+
+      const translation = data.content?.[0]?.text?.trim() || "(Sin texto visible)";
+      trLiveText.textContent = translation;
+      trLiveText.classList.remove("loading");
+
+    } catch (err) {
+      if (liveActive) {
+        trLiveText.textContent = `⚠️ ${err.message}`;
+        trLiveText.classList.remove("loading");
+      }
+    }
+  }
+
+  trLiveBtn.addEventListener("click", () => {
+    liveActive ? stopLive() : startLive();
+  });
+
+  trLiveClose.addEventListener("click", stopLive);
+
+  // Cerrar con tecla Escape
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape" && liveActive) stopLive();
+  });
+
 })();

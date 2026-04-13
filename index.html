@@ -223,6 +223,12 @@
                 <circle cx="12" cy="13" r="4"/>
               </svg>
             </button>
+            <button id="tr-live-btn" class="tr-live-btn" title="Cámara en vivo — traducción continua">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polygon points="23 7 16 12 23 17 23 7"/>
+                <rect x="1" y="5" width="15" height="14" rx="2" ry="2"/>
+              </svg>
+            </button>
             <!-- Input oculto para cámara/galería -->
             <input type="file" id="tr-img-input" accept="image/*" capture="environment" style="display:none" />
           </div>
@@ -233,7 +239,31 @@
 
   </main>
 
-  <script src="app.js?v=8"></script>
+  <!-- LIVE CAMERA OVERLAY -->
+  <div id="tr-live-overlay" class="tr-live-overlay hidden" aria-hidden="true">
+    <video id="tr-live-video" autoplay playsinline muted></video>
+    <div class="tr-live-viewfinder">
+      <div class="tr-live-corner tl"></div>
+      <div class="tr-live-corner tr"></div>
+      <div class="tr-live-corner bl"></div>
+      <div class="tr-live-corner br"></div>
+    </div>
+    <div id="tr-live-result" class="tr-live-result">
+      <div class="tr-live-result-label">🇪🇸 Traducción en vivo</div>
+      <div id="tr-live-text" class="tr-live-text">Apuntando la cámara al texto…</div>
+    </div>
+    <div class="tr-live-topbar">
+      <div id="tr-live-status" class="tr-live-status">
+        <span class="tr-live-dot"></span> Traduciendo en vivo
+      </div>
+      <button id="tr-live-close" class="tr-live-close" title="Cerrar cámara">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>
+    <div id="tr-live-countdown" class="tr-live-countdown hidden"></div>
+  </div>
+
+  <script src="app.js?v=9"></script>
   <script>
     // Registrar Service Worker para PWA
     if ('serviceWorker' in navigator) {
