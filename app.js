@@ -1278,7 +1278,7 @@ updateLevelUI();
   let liveCountTimer = null;
   let liveNextIn     = 0;
   let liveActive     = false;
-  const LIVE_INTERVAL_MS = 12000;
+  const LIVE_INTERVAL_MS = 10000;
 
   async function startLive() {
     if (liveActive) return;
@@ -1402,13 +1402,13 @@ updateLevelUI();
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           model: "claude-haiku-4-5-20251001",
-          max_tokens: 400,
-          system: "You are a translation engine for a live camera AR app. Extract ALL visible text from the image and translate it to Spanish. Output ONLY the translation. No explanations, no labels, no greetings. If no text is visible, reply: (Sin texto visible)",
+          max_tokens: 200,
+          system: "Translate any text in the image to Spanish. RULES: 1) Output ONLY the Spanish translation — nothing else. 2) Never output text in any other language. 3) If no text is visible, output exactly: (Sin texto)",
           messages: [{
             role: "user",
             content: [
               { type: "image", source: { type: "base64", media_type: "image/jpeg", data: base64 } },
-              { type: "text",  text: "Traduce." }
+              { type: "text",  text: "Spanish translation only:" }
             ]
           }]
         })
@@ -1435,7 +1435,7 @@ updateLevelUI();
       trLiveArBubble.classList.remove("hidden");
 
       // 4) Tras 5 segundos, volver al video en vivo y programar siguiente captura
-      await new Promise(r => setTimeout(r, 5000));
+      await new Promise(r => setTimeout(r, 4000));
       if (!liveActive) return;
       showLiveVideo();
       startCountdown(() => captureAndTranslate());
