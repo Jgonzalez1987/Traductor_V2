@@ -1267,7 +1267,6 @@ updateLevelUI();
   const trLiveBtn       = document.getElementById("tr-live-btn");
   const trLiveOverlay   = document.getElementById("tr-live-overlay");
   const trLiveVideo     = document.getElementById("tr-live-video");
-  const trLiveCanvas    = document.getElementById("tr-live-canvas");
   const trLiveScan      = document.getElementById("tr-live-scan");
   const trLiveArBubble  = document.getElementById("tr-live-ar-bubble");
   const trLiveText      = document.getElementById("tr-live-text");
@@ -1348,7 +1347,6 @@ updateLevelUI();
     trLiveVideo.onloadedmetadata = null;
     trLiveOverlay.classList.add("hidden");
     trLiveOverlay.setAttribute("aria-hidden", "true");
-    trLiveCanvas.classList.add("hidden");
     trLiveScan.classList.add("hidden");
     trLiveArBubble.classList.add("hidden");
     trLiveCountdown.classList.add("hidden");
@@ -1356,30 +1354,24 @@ updateLevelUI();
   }
 
   function showLiveVideo() {
-    trLiveCanvas.classList.add("hidden");
     trLiveScan.classList.add("hidden");
     trLiveArBubble.classList.add("hidden");
   }
 
-  function freezeFrameToCanvas() {
+  // Captura frame del video directo a canvas temporal (sin mostrarlo en DOM)
+  function captureFrameBase64() {
     const w = trLiveVideo.videoWidth  || 640;
     const h = trLiveVideo.videoHeight || 480;
-    trLiveCanvas.width  = w;
-    trLiveCanvas.height = h;
-    trLiveCanvas.getContext("2d").drawImage(trLiveVideo, 0, 0, w, h);
-    trLiveCanvas.classList.remove("hidden");
-
-    // Redimensionar a max 1024px para la API
     const maxPx = 1024;
     let rw = w, rh = h;
     if (w > maxPx || h > maxPx) {
       if (w > h) { rh = Math.round(h * maxPx / w); rw = maxPx; }
       else       { rw = Math.round(w * maxPx / h); rh = maxPx; }
     }
-    const tmp = document.createElement("canvas");
-    tmp.width = rw; tmp.height = rh;
-    tmp.getContext("2d").drawImage(trLiveCanvas, 0, 0, rw, rh);
-    return tmp.toDataURL("image/jpeg", 0.82).split(",")[1];
+    const canvas = document.createElement("canvas");
+    canvas.width = rw; canvas.height = rh;
+    canvas.getContext("2d").drawImage(trLiveVideo, 0, 0, rw, rh);
+    return canvas.toDataURL("image/jpeg", 0.82).split(",")[1];
   }
 
   function startCountdown(onDone) {
@@ -1425,8 +1417,8 @@ updateLevelUI();
       if (!liveActive) return;
     }
 
-    // 1) Congelar frame y mostrar scan
-    const base64 = freezeFrameToCanvas();
+    // 1) Capturar frame y mostrar scan (video sigue en vivo)
+    const base64 = captureFrameBase64();
     trLiveScan.classList.remove("hidden");
     setScanLabel("Escaneando…");
     trLiveArBubble.classList.add("hidden");

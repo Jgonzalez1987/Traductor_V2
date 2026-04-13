@@ -241,21 +241,7 @@
 
   <!-- LIVE CAMERA OVERLAY -->
   <div id="tr-live-overlay" class="tr-live-overlay hidden" aria-hidden="true">
-    <!-- Video en vivo -->
     <video id="tr-live-video" autoplay playsinline muted></video>
-    <!-- Canvas para frame congelado durante traducción -->
-    <canvas id="tr-live-canvas" class="tr-live-canvas hidden"></canvas>
-    <!-- Scan animation mientras traduce -->
-    <div id="tr-live-scan" class="tr-live-scan hidden">
-      <div class="tr-scan-line"></div>
-      <div class="tr-scan-label">Escaneando texto…</div>
-    </div>
-    <!-- Burbuja AR con la traducción -->
-    <div id="tr-live-ar-bubble" class="tr-live-ar-bubble hidden">
-      <div class="tr-ar-flag">🇪🇸</div>
-      <div id="tr-live-text" class="tr-live-text"></div>
-    </div>
-    <!-- Barra superior -->
     <div class="tr-live-topbar">
       <div id="tr-live-status" class="tr-live-status">
         <span class="tr-live-dot"></span> Cámara en vivo
@@ -264,11 +250,18 @@
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
       </button>
     </div>
-    <!-- Countdown -->
+    <div id="tr-live-scan" class="tr-live-scan hidden">
+      <div class="tr-scan-line"></div>
+      <div class="tr-scan-label">Escaneando…</div>
+    </div>
+    <div id="tr-live-ar-bubble" class="tr-live-ar-bubble hidden">
+      <div class="tr-ar-flag">🇪🇸</div>
+      <div id="tr-live-text" class="tr-live-text"></div>
+    </div>
     <div id="tr-live-countdown" class="tr-live-countdown hidden"></div>
   </div>
 
-  <script src="app.js?v=15"></script>
+  <script src="app.js?v=16"></script>
   <script>
     // Registrar Service Worker para PWA
     if ('serviceWorker' in navigator) {

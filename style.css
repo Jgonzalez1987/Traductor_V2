@@ -1982,17 +1982,9 @@ body:has(#tab-chat.tab.active) .wa-chat-wrap {
   width: 100%;
   height: 100%;
   object-fit: cover;
-  z-index: 0;
+  z-index: 2;
   display: block;
-}
-
-.tr-live-canvas {
-  position: absolute;
-  top: 0; left: 0;
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  z-index: 1;
+  background: transparent;
 }
 
 .tr-live-canvas { z-index: 1; }
@@ -2051,7 +2043,7 @@ body:has(#tab-chat.tab.active) .wa-chat-wrap {
 .tr-live-scan {
   position: absolute;
   inset: 0;
-  z-index: 5;
+  z-index: 10;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -2095,7 +2087,7 @@ body:has(#tab-chat.tab.active) .wa-chat-wrap {
 /* AR translation bubble — floats in center of screen */
 .tr-live-ar-bubble {
   position: absolute;
-  z-index: 8;
+  z-index: 12;
   top: 50%;
   left: 50%;
   transform: translate(-50%, -50%);
