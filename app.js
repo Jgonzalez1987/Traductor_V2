@@ -704,7 +704,7 @@ updateLevelUI();
     "pt-BR":"🇧🇷 Portugués","it-IT":"🇮🇹 Italiano","zh-CN":"🇨🇳 Chino",
     "ja-JP":"🇯🇵 Japonés","ko-KR":"🇰🇷 Coreano","ar-SA":"🇸🇦 Árabe",
     "ru-RU":"🇷🇺 Ruso","hi-IN":"🇮🇳 Hindi","nl-NL":"🇳🇱 Holandés",
-    "th-TH":"🇹🇭 Tailandés","tr-TR":"🇹🇷 Turco"
+    "th-TH":"🇹🇭 Tailandés","tr-TR":"🇹🇷 Turco","vi-VN":"🇻🇳 Vietnamita"
   };
 
   // Modo: 'to-es' = idioma→español | 'to-lang' = español→idioma
