@@ -1399,25 +1399,48 @@ updateLevelUI();
     liveCountTimer = setTimeout(tick, 1000);
   }
 
+  const trScanLabel = trLiveScan?.querySelector(".tr-scan-label");
+
+  function setScanLabel(text) {
+    if (trScanLabel) trScanLabel.textContent = text;
+  }
+
+  function showArBubble(text) {
+    trLiveScan.classList.add("hidden");
+    trLiveText.textContent = text;
+    // Forzar re-trigger de animación
+    trLiveArBubble.classList.add("hidden");
+    void trLiveArBubble.offsetWidth; // reflow
+    trLiveArBubble.classList.remove("hidden");
+  }
+
   async function captureAndTranslate() {
     if (!liveActive) return;
 
-    // Esperar dimensiones si es la primera vez
-    if (!trLiveVideo.videoWidth) {
-      await new Promise(r => setTimeout(r, 600));
+    // Esperar dimensiones si el video aún no arrancó
+    let waitTries = 0;
+    while (!trLiveVideo.videoWidth && waitTries < 10) {
+      await new Promise(r => setTimeout(r, 400));
+      waitTries++;
       if (!liveActive) return;
     }
 
-    // 1) Congelar el frame visible
+    // 1) Congelar frame y mostrar scan
     const base64 = freezeFrameToCanvas();
-
-    // 2) Mostrar animación de escaneo sobre el frame congelado
     trLiveScan.classList.remove("hidden");
+    setScanLabel("Escaneando…");
     trLiveArBubble.classList.add("hidden");
 
     try {
+      setScanLabel("Traduciendo…");
+
+      // Fetch con timeout de 20 segundos
+      const controller = new AbortController();
+      const timeoutId  = setTimeout(() => controller.abort(), 20000);
+
       const res = await fetch(`${API_BASE}/api/chat`, {
         method: "POST",
+        signal: controller.signal,
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           model: "claude-haiku-4-5-20251001",
@@ -1432,13 +1455,16 @@ updateLevelUI();
           }]
         })
       });
+      clearTimeout(timeoutId);
 
       if (!liveActive) return;
 
       const data = await res.json();
 
       if (res.status === 429) {
-        // Rate limit: volver al video en vivo y reintentar en el siguiente ciclo
+        showArBubble("⏳ Límite de velocidad, esperando…");
+        await new Promise(r => setTimeout(r, 4000));
+        if (!liveActive) return;
         showLiveVideo();
         startCountdown(() => captureAndTranslate());
         return;
@@ -1446,14 +1472,12 @@ updateLevelUI();
 
       if (!res.ok) throw new Error(data?.error?.message || `HTTP ${res.status}`);
 
-      const translation = data.content?.[0]?.text?.trim() || "(Sin texto visible)";
+      const translation = data.content?.[0]?.text?.trim() || "(Sin texto)";
 
-      // 3) Ocultar scan, mostrar burbuja AR sobre el frame congelado
-      trLiveScan.classList.add("hidden");
-      trLiveText.textContent = translation;
-      trLiveArBubble.classList.remove("hidden");
+      // 3) Mostrar burbuja AR encima del frame congelado
+      showArBubble(translation);
 
-      // 4) Tras 5 segundos, volver al video en vivo y programar siguiente captura
+      // 4) Tras 4 segundos volver al video en vivo
       await new Promise(r => setTimeout(r, 4000));
       if (!liveActive) return;
       showLiveVideo();
@@ -1461,9 +1485,8 @@ updateLevelUI();
 
     } catch (err) {
       if (!liveActive) return;
-      trLiveScan.classList.add("hidden");
-      trLiveText.textContent = `⚠️ ${err.message}`;
-      trLiveArBubble.classList.remove("hidden");
+      const msg = err.name === "AbortError" ? "⏱ Tiempo de espera agotado" : `⚠️ ${err.message}`;
+      showArBubble(msg);
       await new Promise(r => setTimeout(r, 4000));
       if (!liveActive) return;
       showLiveVideo();
