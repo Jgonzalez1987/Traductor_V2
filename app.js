@@ -1217,7 +1217,7 @@ updateLevelUI();
         body: JSON.stringify({
           model: "claude-haiku-4-5-20251001",
           max_tokens: 1000,
-          system: "You are a translator. The user sends an image (e.g. a restaurant menu, sign, or document). Extract ALL visible text from the image and translate it to Spanish. Output format:\n- If it's a menu or list, show each item as: [original] → [traducción]\n- If it's a sentence or paragraph, translate directly.\n- Output ONLY the translation content. No explanations, no greetings.",
+          system: "You are a translation engine. Extract the visible text from the image and translate it to Spanish. Output ONLY the translated text, nothing else. No explanations, no descriptions, no formatting labels, no greetings. Just the translation.",
           messages: [{
             role: "user",
             content: [
