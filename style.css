@@ -1968,7 +1968,7 @@ body:has(#tab-chat.tab.active) .wa-chat-wrap {
    ============================================================ */
 .tr-live-overlay {
   position: fixed;
-  inset: 0;
+  top: 0; left: 0; right: 0; bottom: 0;
   z-index: 10000;
   background: #000;
   overflow: hidden;
@@ -1976,13 +1976,23 @@ body:has(#tab-chat.tab.active) .wa-chat-wrap {
 
 .tr-live-overlay.hidden { display: none; }
 
-#tr-live-video,
-.tr-live-canvas {
+#tr-live-video {
   position: absolute;
-  inset: 0;
+  top: 0; left: 0;
   width: 100%;
   height: 100%;
   object-fit: cover;
+  z-index: 0;
+  display: block;
+}
+
+.tr-live-canvas {
+  position: absolute;
+  top: 0; left: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  z-index: 1;
 }
 
 .tr-live-canvas { z-index: 1; }

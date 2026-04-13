@@ -1305,29 +1305,32 @@ updateLevelUI();
     liveActive = true;
     trLiveBtn.classList.add("active");
 
-    // Android requiere estas propiedades explícitas para mostrar el video
-    trLiveVideo.setAttribute("autoplay", "");
-    trLiveVideo.setAttribute("playsinline", "");
-    trLiveVideo.setAttribute("muted", "");
-    trLiveVideo.muted = true;
-    trLiveVideo.playsInline = true;
-    trLiveVideo.srcObject = liveStream;
-
+    // 1) Mostrar overlay PRIMERO — Android necesita el elemento visible antes de asignar stream
     trLiveOverlay.classList.remove("hidden");
     trLiveOverlay.setAttribute("aria-hidden", "false");
 
-    // Forzar play() explícito — necesario en Android Chrome
+    // 2) Esperar 2 frames para que el DOM renderice el overlay
+    await new Promise(r => requestAnimationFrame(r));
+    await new Promise(r => requestAnimationFrame(r));
+
+    // 3) Configurar video con propiedades JS (no solo atributos HTML)
+    trLiveVideo.muted      = true;
+    trLiveVideo.playsInline = true;
+    trLiveVideo.srcObject  = liveStream;
+
+    // 4) Forzar play() — Android ignora autoplay sin esta llamada explícita
     try { await trLiveVideo.play(); } catch (_) {}
 
-    // Primera captura cuando el video tenga dimensiones reales
-    trLiveVideo.onloadedmetadata = async () => {
-      await new Promise(r => setTimeout(r, 300)); // pequeño delay para que el frame sea visible
-      captureAndTranslate();
+    // 5) Primera captura cuando el video tenga dimensiones reales
+    const doFirstCapture = async () => {
+      await new Promise(r => setTimeout(r, 500));
+      if (liveActive) captureAndTranslate();
     };
-    // Fallback si el video ya estaba listo
+
     if (trLiveVideo.readyState >= 2) {
-      await new Promise(r => setTimeout(r, 300));
-      captureAndTranslate();
+      doFirstCapture();
+    } else {
+      trLiveVideo.onloadedmetadata = doFirstCapture;
     }
   }
 
