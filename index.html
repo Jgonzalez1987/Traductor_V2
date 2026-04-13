@@ -240,8 +240,11 @@
   </main>
 
   <!-- LIVE CAMERA OVERLAY -->
+  <!-- Video oculto — solo fuente para el canvas -->
+  <video id="tr-live-video" autoplay playsinline muted style="position:fixed;top:-9999px;left:-9999px;width:1px;height:1px;opacity:0;pointer-events:none;"></video>
   <div id="tr-live-overlay" class="tr-live-overlay hidden" aria-hidden="true">
-    <video id="tr-live-video" autoplay playsinline muted></video>
+    <!-- Canvas dibuja los frames del video (más confiable en Android) -->
+    <canvas id="tr-live-canvas"></canvas>
     <div class="tr-live-topbar">
       <div id="tr-live-status" class="tr-live-status">
         <span class="tr-live-dot"></span> Cámara en vivo
@@ -261,7 +264,7 @@
     <div id="tr-live-countdown" class="tr-live-countdown hidden"></div>
   </div>
 
-  <script src="app.js?v=17"></script>
+  <script src="app.js?v=18"></script>
   <script>
     // Registrar Service Worker para PWA
     if ('serviceWorker' in navigator) {

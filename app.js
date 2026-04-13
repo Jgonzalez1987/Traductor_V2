@@ -1267,6 +1267,7 @@ updateLevelUI();
   const trLiveBtn       = document.getElementById("tr-live-btn");
   const trLiveOverlay   = document.getElementById("tr-live-overlay");
   const trLiveVideo     = document.getElementById("tr-live-video");
+  const trLiveCanvas    = document.getElementById("tr-live-canvas");
   const trLiveScan      = document.getElementById("tr-live-scan");
   const trLiveArBubble  = document.getElementById("tr-live-ar-bubble");
   const trLiveText      = document.getElementById("tr-live-text");
@@ -1277,7 +1278,35 @@ updateLevelUI();
   let liveCountTimer = null;
   let liveNextIn     = 0;
   let liveActive     = false;
+  let liveRafId      = null; // requestAnimationFrame loop
   const LIVE_INTERVAL_MS = 10000;
+
+  // Dibuja frames del video al canvas continualmente (evita pantalla negra en Android)
+  function startCanvasLoop() {
+    const ctx = trLiveCanvas.getContext("2d");
+    function draw() {
+      if (!liveActive) return;
+      if (trLiveVideo.readyState >= 2) {
+        const vw = trLiveVideo.videoWidth  || trLiveCanvas.width;
+        const vh = trLiveVideo.videoHeight || trLiveCanvas.height;
+        // Ajustar canvas al tamaño de la pantalla manteniendo aspect ratio (cover)
+        const cw = trLiveCanvas.offsetWidth  || window.innerWidth;
+        const ch = trLiveCanvas.offsetHeight || window.innerHeight;
+        if (trLiveCanvas.width !== cw)  trLiveCanvas.width  = cw;
+        if (trLiveCanvas.height !== ch) trLiveCanvas.height = ch;
+        const scale = Math.max(cw / vw, ch / vh);
+        const dw = vw * scale, dh = vh * scale;
+        const dx = (cw - dw) / 2, dy = (ch - dh) / 2;
+        ctx.drawImage(trLiveVideo, dx, dy, dw, dh);
+      }
+      liveRafId = requestAnimationFrame(draw);
+    }
+    liveRafId = requestAnimationFrame(draw);
+  }
+
+  function stopCanvasLoop() {
+    if (liveRafId) { cancelAnimationFrame(liveRafId); liveRafId = null; }
+  }
 
   async function startLive() {
     if (liveActive) return;
@@ -1304,25 +1333,20 @@ updateLevelUI();
     liveActive = true;
     trLiveBtn.classList.add("active");
 
-    // 1) Mostrar overlay PRIMERO — Android necesita el elemento visible antes de asignar stream
-    trLiveOverlay.classList.remove("hidden");
-    trLiveOverlay.setAttribute("aria-hidden", "false");
-
-    // 2) Esperar 2 frames para que el DOM renderice el overlay
-    await new Promise(r => requestAnimationFrame(r));
-    await new Promise(r => requestAnimationFrame(r));
-
-    // 3) Configurar video con propiedades JS (no solo atributos HTML)
-    trLiveVideo.muted      = true;
+    // 1) Configurar video oculto
+    trLiveVideo.muted       = true;
     trLiveVideo.playsInline = true;
-    trLiveVideo.srcObject  = liveStream;
-
-    // 4) Forzar play() — Android ignora autoplay sin esta llamada explícita
+    trLiveVideo.srcObject   = liveStream;
     try { await trLiveVideo.play(); } catch (_) {}
 
-    // 5) Primera captura cuando el video tenga dimensiones reales
+    // 2) Mostrar overlay y arrancar loop de canvas
+    trLiveOverlay.classList.remove("hidden");
+    trLiveOverlay.setAttribute("aria-hidden", "false");
+    startCanvasLoop();
+
+    // 3) Primera captura cuando el video tenga dimensiones
     const doFirstCapture = async () => {
-      await new Promise(r => setTimeout(r, 500));
+      await new Promise(r => setTimeout(r, 600));
       if (liveActive) captureAndTranslate();
     };
 
@@ -1330,6 +1354,7 @@ updateLevelUI();
       doFirstCapture();
     } else {
       trLiveVideo.onloadedmetadata = doFirstCapture;
+      setTimeout(() => { if (liveActive && !trLiveVideo.videoWidth) doFirstCapture(); }, 2000);
     }
   }
 
@@ -1342,6 +1367,7 @@ updateLevelUI();
       liveStream.getTracks().forEach(t => t.stop());
       liveStream = null;
     }
+    stopCanvasLoop();
     trLiveVideo.pause();
     trLiveVideo.srcObject = null;
     trLiveVideo.onloadedmetadata = null;
@@ -1358,20 +1384,20 @@ updateLevelUI();
     trLiveArBubble.classList.add("hidden");
   }
 
-  // Captura frame del video directo a canvas temporal (sin mostrarlo en DOM)
+  // Captura frame desde el canvas visible (ya tiene el frame actual)
   function captureFrameBase64() {
-    const w = trLiveVideo.videoWidth  || 640;
-    const h = trLiveVideo.videoHeight || 480;
+    const sw = trLiveCanvas.width  || 640;
+    const sh = trLiveCanvas.height || 480;
     const maxPx = 1024;
-    let rw = w, rh = h;
-    if (w > maxPx || h > maxPx) {
-      if (w > h) { rh = Math.round(h * maxPx / w); rw = maxPx; }
-      else       { rw = Math.round(w * maxPx / h); rh = maxPx; }
+    let rw = sw, rh = sh;
+    if (sw > maxPx || sh > maxPx) {
+      if (sw > sh) { rh = Math.round(sh * maxPx / sw); rw = maxPx; }
+      else         { rw = Math.round(sw * maxPx / sh); rh = maxPx; }
     }
-    const canvas = document.createElement("canvas");
-    canvas.width = rw; canvas.height = rh;
-    canvas.getContext("2d").drawImage(trLiveVideo, 0, 0, rw, rh);
-    return canvas.toDataURL("image/jpeg", 0.82).split(",")[1];
+    const tmp = document.createElement("canvas");
+    tmp.width = rw; tmp.height = rh;
+    tmp.getContext("2d").drawImage(trLiveCanvas, 0, 0, rw, rh);
+    return tmp.toDataURL("image/jpeg", 0.82).split(",")[1];
   }
 
   function startCountdown(onDone) {
