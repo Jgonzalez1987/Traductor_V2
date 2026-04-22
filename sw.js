@@ -1,9 +1,9 @@
-const CACHE_NAME = 'fluentia-v15';
+const CACHE_NAME = 'fluentia-v16';
 const STATIC_ASSETS = [
   './',
   './index.html',
   './style.css?v=10',
-  './app.js?v=18',
+  './app.js?v=19',
   './manifest.json',
   './Fondo.mp4',
   './icons/icon-192.png',

@@ -229,8 +229,20 @@
                 <rect x="1" y="5" width="15" height="14" rx="2" ry="2"/>
               </svg>
             </button>
-            <!-- Input oculto para cámara/galería -->
-            <input type="file" id="tr-img-input" accept="image/*" capture="environment" style="display:none" />
+            <!-- Inputs ocultos para cámara y galería -->
+            <input type="file" id="tr-img-camera"  accept="image/*" capture="environment" style="display:none" />
+            <input type="file" id="tr-img-gallery" accept="image/*" style="display:none" />
+            <!-- Popup de selección -->
+            <div id="tr-cam-popup" class="tr-cam-popup hidden">
+              <button class="tr-cam-option" id="tr-opt-camera">
+                <span class="tr-cam-opt-icon">📷</span>
+                <span>Tomar foto</span>
+              </button>
+              <button class="tr-cam-option" id="tr-opt-gallery">
+                <span class="tr-cam-opt-icon">🖼️</span>
+                <span>Elegir de galería</span>
+              </button>
+            </div>
           </div>
         </div>
 
@@ -264,7 +276,7 @@
     <div id="tr-live-countdown" class="tr-live-countdown hidden"></div>
   </div>
 
-  <script src="app.js?v=18"></script>
+  <script src="app.js?v=19"></script>
   <script>
     // Registrar Service Worker para PWA
     if ('serviceWorker' in navigator) {

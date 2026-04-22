@@ -1133,19 +1133,33 @@ updateLevelUI();
   // ============================================================
   //  TRADUCCIÓN DE IMÁGENES — Claude Vision
   // ============================================================
-  const trCamBtn   = document.getElementById("tr-cam-btn");
-  const trImgInput = document.getElementById("tr-img-input");
+  const trCamBtn     = document.getElementById("tr-cam-btn");
+  const trCamPopup   = document.getElementById("tr-cam-popup");
+  const trImgCamera  = document.getElementById("tr-img-camera");
+  const trImgGallery = document.getElementById("tr-img-gallery");
 
-  trCamBtn.addEventListener("click", () => trImgInput.click());
+  // Mostrar/ocultar popup al tocar el botón cámara
+  trCamBtn.addEventListener("click", (e) => {
+    e.stopPropagation();
+    trCamPopup.classList.toggle("hidden");
+  });
+  // Cerrar popup al tocar fuera
+  document.addEventListener("click", () => trCamPopup.classList.add("hidden"));
 
-  trImgInput.addEventListener("change", async () => {
-    const file = trImgInput.files[0];
+  document.getElementById("tr-opt-camera").addEventListener("click", () => {
+    trCamPopup.classList.add("hidden");
+    trImgCamera.click();
+  });
+  document.getElementById("tr-opt-gallery").addEventListener("click", () => {
+    trCamPopup.classList.add("hidden");
+    trImgGallery.click();
+  });
+
+  async function handleImageFile(file, inputEl) {
     if (!file) return;
-    trImgInput.value = ""; // reset para permitir la misma foto de nuevo
-
+    inputEl.value = "";
     trCamBtn.classList.add("loading");
     setStatus("📷 Analizando imagen...", true);
-
     try {
       const { base64, mime } = await resizeAndEncode(file, 1024);
       await translateImage(base64, mime, file);
@@ -1153,10 +1167,13 @@ updateLevelUI();
       toast(`Error al procesar imagen: ${err.message}`, "error");
     } finally {
       trCamBtn.classList.remove("loading");
-      setStatus(trIsListening ? "🔴 Escuchando..." : "Selecciona idioma y presiona el micrófono",
-                trIsListening);
+      setStatus(trIsListening ? "🔴 Escuchando..." : "Selecciona idioma y presiona el micrófono", trIsListening);
     }
-  });
+  }
+
+  trImgCamera.addEventListener("change",  () => handleImageFile(trImgCamera.files[0],  trImgCamera));
+  trImgGallery.addEventListener("change", () => handleImageFile(trImgGallery.files[0], trImgGallery));
+
 
   // Redimensionar imagen a max px y devolver base64
   function resizeAndEncode(file, maxPx) {
@@ -1463,12 +1480,12 @@ updateLevelUI();
         body: JSON.stringify({
           model: "claude-haiku-4-5-20251001",
           max_tokens: 200,
-          system: "You are a live camera translator. Look at the image and translate foreign text to Spanish. PRIORITY ORDER: 1) FIRST look for text in non-Latin scripts: Thai, Chinese, Japanese, Korean, Arabic, Hindi, Russian, etc. Translate those first. 2) If no non-Latin script text found, translate any English text to Spanish. 3) COMPLETELY IGNORE text already in Spanish — never repeat it. 4) IGNORE browser UI, menus, buttons, and interface elements — focus on the main content text. 5) Output ONLY the Spanish translation, nothing else. 6) If truly no foreign text found, output: (Sin texto extranjero)",
+          system: "Translate the text in this image to Spanish. Output ONLY the Spanish translation. Nothing else.",
           messages: [{
             role: "user",
             content: [
               { type: "image", source: { type: "base64", media_type: "image/jpeg", data: base64 } },
-              { type: "text",  text: "Spanish translation only:" }
+              { type: "text",  text: "Translate all text in this image to Spanish. Reply with ONLY the Spanish translation." }
             ]
           }]
         })
